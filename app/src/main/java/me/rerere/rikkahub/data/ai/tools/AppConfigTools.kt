@@ -16,6 +16,9 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.ai.mcp.McpCommonOptions
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.datastore.SettingApplyResult
+import me.rerere.rikkahub.data.datastore.WRITABLE_SETTING_KEYS
+import me.rerere.rikkahub.data.datastore.applyWritableSetting
 import me.rerere.rikkahub.data.datastore.findModelById
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.model.AgentPermissionLevel
@@ -300,12 +303,6 @@ private fun skillDeleteTool(
 
 // ---------------------------------------------------------------- 全局设置
 
-private val WRITABLE_SETTING_KEYS = listOf(
-    "dynamic_color", "developer_mode", "enable_auto_title", "enable_suggestion",
-    "chat_model_id", "fast_model_id", "translate_target_language",
-    "web_server_enabled", "web_server_port", "web_server_localhost_only",
-)
-
 private fun settingSetTool(updateSettings: suspend ((Settings) -> Settings) -> Unit) = Tool(
     name = "setting_set",
     description = """
@@ -331,17 +328,17 @@ private fun settingSetTool(updateSettings: suspend ((Settings) -> Settings) -> U
     execute = { args ->
         toolResult {
             val key = args.strOrNull("key") ?: throw ToolInputException("key is required")
-            if (key !in WRITABLE_SETTING_KEYS) {
-                throw ToolInputException(
-                    "setting is not writable: $key (allowed: ${WRITABLE_SETTING_KEYS.joinToString(", ")})"
-                )
-            }
             val value = args.strOrNull("value") ?: throw ToolInputException("value is required")
             var applied: String = value
             updateSettings { latest ->
-                val (next, appliedValue) = latest.applySetting(key, value)
-                applied = appliedValue
-                next
+                when (val result = latest.applyWritableSetting(key, value)) {
+                    is SettingApplyResult.Applied -> {
+                        applied = result.normalized
+                        result.settings
+                    }
+
+                    is SettingApplyResult.Rejected -> throw ToolInputException(result.reason)
+                }
             }
             listOf(UIMessagePart.Text(JsonInstantPretty.encodeToString(buildJsonObject {
                 put("ok", true)
@@ -351,41 +348,6 @@ private fun settingSetTool(updateSettings: suspend ((Settings) -> Settings) -> U
         }
     },
 )
-
-private fun Settings.applySetting(key: String, raw: String): Pair<Settings, String> = when (key) {
-    "dynamic_color" -> copy(dynamicColor = raw.toBool(key)) to raw.toBool(key).toString()
-    "developer_mode" -> copy(developerMode = raw.toBool(key)) to raw.toBool(key).toString()
-    "enable_auto_title" -> copy(enableAutoTitle = raw.toBool(key)) to raw.toBool(key).toString()
-    "enable_suggestion" -> copy(enableSuggestion = raw.toBool(key)) to raw.toBool(key).toString()
-    "chat_model_id" -> copy(chatModelId = raw.toModelId(this)) to raw
-    "fast_model_id" -> copy(fastModelId = raw.toModelId(this)) to raw
-    "translate_target_language" -> {
-        if (raw.length > 20) throw ToolInputException("language tag looks invalid: $raw")
-        copy(translateTargetLanguage = raw) to raw
-    }
-
-    "web_server_enabled" -> copy(webServerEnabled = raw.toBool(key)) to raw.toBool(key).toString()
-    "web_server_localhost_only" -> copy(webServerLocalhostOnly = raw.toBool(key)) to raw.toBool(key).toString()
-    "web_server_port" -> {
-        val port = raw.toIntOrNull()?.takeIf { it in 1024..65535 }
-            ?: throw ToolInputException("web_server_port must be 1024..65535")
-        copy(webServerPort = port) to port.toString()
-    }
-
-    else -> throw ToolInputException("setting is not writable: $key")
-}
-
-private fun String.toBool(key: String): Boolean =
-    toBooleanStrictOrNull() ?: throw ToolInputException("$key expects true or false")
-
-private fun String.toModelId(settings: Settings): Uuid {
-    val id = runCatching { Uuid.parse(this) }.getOrNull()
-        ?: throw ToolInputException("invalid model id: $this")
-    if (settings.findModelById(id) == null) {
-        throw ToolInputException("model not found: $this (use app_list_models)")
-    }
-    return id
-}
 
 // ---------------------------------------------------------------- MCP
 
@@ -721,7 +683,11 @@ private fun Assistant.applyPatch(
     args.strOrNull("name")?.let { next = next.copy(name = it) }
     args.strOrNull("system_prompt")?.let { next = next.copy(systemPrompt = it) }
     args.strOrNull("chat_model_id")?.let { raw ->
-        val id = raw.toModelId(settings)
+        val id = runCatching { Uuid.parse(raw) }.getOrNull()
+            ?: throw ToolInputException("invalid model id: $raw")
+        if (settings.findModelById(id) == null) {
+            throw ToolInputException("model not found: $raw (use app_list_models)")
+        }
         next = next.copy(chatModelId = id)
     }
     if (args.hasArg("workspace_id")) {

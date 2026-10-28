@@ -111,6 +111,36 @@ class WorkspaceRepository(
         }
     }
 
+    /**
+     * 只改 SSH 凭据，其余配置原样保留。
+     *
+     * 传 null 表示沿用已保存的值（[SshWorkspaceDraft] 里留空就是这个语义），
+     * 所以 agent 改密码时不会把主机地址、私钥之类一起覆盖掉。
+     */
+    suspend fun updateSshCredentials(
+        id: String,
+        password: String? = null,
+        privateKey: String? = null,
+        passphrase: String? = null,
+    ) {
+        val workspace = dao.getById(id) ?: error("Workspace not found: $id")
+        val settings = workspace.sshSettings() ?: error("SSH workspace config is missing: $id")
+        saveSsh(
+            id,
+            SshWorkspaceDraft(
+                name = workspace.name,
+                host = settings.host,
+                port = settings.port,
+                username = settings.username,
+                authType = settings.authType,
+                password = password.orEmpty(),
+                privateKey = privateKey.orEmpty(),
+                passphrase = passphrase.orEmpty(),
+                hostKey = settings.hostKey,
+            ),
+        )
+    }
+
     /** 新建 ([id] 为 null) 或更新 SSH 工作区 */
     suspend fun saveSsh(id: String?, draft: SshWorkspaceDraft): WorkspaceEntity {
         val existing = id?.let { dao.getById(it) ?: error("Workspace not found: $it") }

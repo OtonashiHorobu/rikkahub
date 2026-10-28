@@ -16,6 +16,7 @@ import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.repository.AppConfigAuditRepository
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
@@ -50,6 +51,7 @@ class ChatToolFactory(
     private val workspaceRepository: WorkspaceRepository,
     private val appEventBus: AppEventBus,
     private val settingsStore: SettingsStore,
+    private val auditRepository: AppConfigAuditRepository,
     /** 延迟解析，ChatService 依赖本类，直接构造会成环 */
     private val lazyCwdWriter: Lazy<ConversationCwdWriter>? = null,
 ) {
@@ -100,7 +102,18 @@ class ChatToolFactory(
                     currentAssistantId = assistant.id,
                     workspaces = { workspaceRepository.listFlow().first() },
                     skills = { skillManager.listSkills() },
-                )
+                ).map { tool -> withConfigAudit(tool, conversationId, assistant.id) }
+            )
+            // F2 SECRETS 档：凭据只写不读，返回值固定 { ok, masked }
+            addAll(
+                createAppSecretTools(
+                    updateSettings = { block -> settingsStore.update(block) },
+                    masker = SecretMasker { collectKnownSecrets(settings) },
+                    workspaces = { workspaceRepository.listFlow().first() },
+                    saveSshCredentials = { id, password, privateKey, passphrase ->
+                        workspaceRepository.updateSshCredentials(id, password, privateKey, passphrase)
+                    },
+                ).map { tool -> withConfigAudit(tool, conversationId, assistant.id) }
             )
             if (assistant.enabledSkills.isNotEmpty()) {
                 addAll(
@@ -135,9 +148,36 @@ class ChatToolFactory(
         // 文件放在本机, 只有本地 Rootfs 挂载了 /tool_outputs, 远程工作区同样读不到
         val canReadToolOutputs = workspaceTools.isNotEmpty() &&
             assistant.workspaceId?.let { workspaceRepository.getById(it.toString()) }?.capabilities()?.rootfs == true
-        val truncatable = if (canReadToolOutputs) tools.map(::withOutputTruncation) else tools
+        val masker = SecretMasker { collectKnownSecrets(settings) }
+        val masked = tools.map { tool -> withSecretMasking(tool, masker) }
+        val truncatable = if (canReadToolOutputs) masked.map(::withOutputTruncation) else masked
         // 权限等级只裁剪"注册给模型的工具"，不改变审批；未被登记的工具按 READ_ONLY 处理
         return truncatable.filter { permissionLevel.grants(AgentToolLevels.requiredLevel(it.name)) }
+    }
+
+    /** 配置类工具执行前后各取一份设置做 diff，命中变化的对象就落一行审计，失败不影响工具结果 */
+    private fun withConfigAudit(tool: Tool, conversationId: Uuid?, assistantId: Uuid): Tool {
+        val execute = tool.execute
+        return tool.copy(execute = { args ->
+            val before = settingsStore.settingsFlow.value
+            val result = execute(args)
+            val after = settingsStore.settingsFlow.value
+            if (before != after) {
+                runCatching { auditRepository.recordDiff(tool.name, conversationId, assistantId, before, after) }
+                    .onFailure { Log.w(TAG, "recordDiff failed for ${tool.name}", it) }
+            }
+            result
+        })
+    }
+
+    /** 工具回给模型的文本先过一遍脱敏，再考虑截断，避免把密钥写进 tool_outputs 文件 */
+    private fun withSecretMasking(tool: Tool, masker: SecretMasker): Tool {
+        val execute = tool.execute
+        return tool.copy(execute = { args ->
+            execute(args).map { part ->
+                if (part is UIMessagePart.Text) part.copy(text = masker.mask(part.text)) else part
+            }
+        })
     }
 
     private fun withOutputTruncation(tool: Tool): Tool {

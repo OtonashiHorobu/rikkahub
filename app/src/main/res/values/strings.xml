@@ -1229,6 +1229,14 @@
   <string name="workspace_terminal_close_confirm_message">Closing this tab will terminate any process still running in it.</string>
   <string name="workspace_terminal_close">Close</string>
   <string name="workspace_terminal_no_tabs">No open terminal tabs</string>
+  <string name="extensions_page_agent_audit">Agent change log</string>
+  <string name="extensions_page_agent_audit_desc">Review and undo configuration changes made by the assistant</string>
+  <string name="agent_audit_title">Agent change log</string>
+  <string name="agent_audit_empty">No configuration changes yet</string>
+  <string name="agent_audit_clear">Clear</string>
+  <string name="agent_audit_revert">Undo</string>
+  <string name="agent_audit_reverted">Undone</string>
+  <string name="agent_audit_not_revertable">Contains credentials</string>
   <string name="extensions_page_workspace">Workspace</string>
   <string name="extensions_page_workspace_desc">Manage local working directories accessible by Agent</string>
   <string name="workspace_select">Select Workspace</string>

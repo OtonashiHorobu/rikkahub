@@ -1205,6 +1205,14 @@ mDNS 地址：使用 .local 主机名，同一网络中的其他设备可通过�
   <string name="workspace_terminal_not_installed">请先安装 Rootfs</string>
   <string name="workspace_terminal_loading">正在加载工作区…</string>
   <string name="workspace_terminal_exited">终端已退出</string>
+  <string name="extensions_page_agent_audit">Agent 变更记录</string>
+  <string name="extensions_page_agent_audit_desc">查看并撤销助手改过的配置</string>
+  <string name="agent_audit_title">Agent 变更记录</string>
+  <string name="agent_audit_empty">还没有配置变更</string>
+  <string name="agent_audit_clear">清空</string>
+  <string name="agent_audit_revert">撤销</string>
+  <string name="agent_audit_reverted">已撤销</string>
+  <string name="agent_audit_not_revertable">含凭据，不可撤销</string>
   <string name="extensions_page_workspace">工作区</string>
   <string name="extensions_page_workspace_desc">管理可由Agent访问的本地工作目录</string>
   <string name="workspace_select">选择工作区</string>

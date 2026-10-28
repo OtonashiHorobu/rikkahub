@@ -534,6 +534,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingFilesPage()
                             }
 
+                            entry<Screen.SettingAgentAudit> {
+                                me.rerere.rikkahub.ui.pages.extensions.AgentAuditPage()
+                            }
+
                             entry<Screen.SettingWeb> {
                                 SettingWebPage()
                             }
@@ -783,6 +787,10 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object SettingWeb : Screen
+
+    /** Agent 改配置的变更记录 */
+    @Serializable
+    data object SettingAgentAudit : Screen
 
     @Serializable
     data object Debug : Screen

@@ -1,8 +1,10 @@
 package me.rerere.rikkahub.di
 
 import android.content.Context
+import me.rerere.rikkahub.data.db.AppDatabase
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.files.FilesManager
+import me.rerere.rikkahub.data.repository.AppConfigAuditRepository
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.FavoriteRepository
 import me.rerere.rikkahub.data.repository.FilesRepository
@@ -95,6 +97,13 @@ val repositoryModule = module {
 
     single {
         WorkspaceRepository(get(), get(), get(), get(), get())
+    }
+
+    single {
+        AppConfigAuditRepository(
+            dao = get<AppDatabase>().appConfigAuditDao(),
+            applySettings = { block -> get<me.rerere.rikkahub.data.datastore.SettingsStore>().update(block) },
+        )
     }
 
     single {
