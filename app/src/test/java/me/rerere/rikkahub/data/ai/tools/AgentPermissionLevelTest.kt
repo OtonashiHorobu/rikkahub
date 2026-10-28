@@ -43,7 +43,10 @@ class AgentPermissionLevelTest {
     fun `old four level values migrate to three`() {
         assertEquals(AgentPermissionLevel.READ_ONLY, AgentPermissionLevel.parseOrWorkspaceWrite("read_only"))
         assertEquals(AgentPermissionLevel.WORKSPACE_WRITE, AgentPermissionLevel.parseOrWorkspaceWrite("config"))
-        assertEquals(AgentPermissionLevel.WORKSPACE_WRITE, AgentPermissionLevel.parseOrWorkspaceWrite("workspace_write"))
+        assertEquals(
+            AgentPermissionLevel.WORKSPACE_WRITE,
+            AgentPermissionLevel.parseOrWorkspaceWrite("workspace_write")
+        )
         // secrets 原来是"写凭据"，收紧到完全放行才给
         assertEquals(AgentPermissionLevel.FULL_ACCESS, AgentPermissionLevel.parseOrWorkspaceWrite("secrets"))
         assertEquals(AgentPermissionLevel.FULL_ACCESS, AgentPermissionLevel.parseOrWorkspaceWrite("device"))

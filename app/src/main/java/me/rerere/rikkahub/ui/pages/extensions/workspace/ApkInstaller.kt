@@ -11,8 +11,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.security.MessageDigest
 
@@ -170,9 +170,13 @@ object ApkInstaller {
             ?: return@withContext Result.failure(
                 IllegalStateException("安装器没有在 ${timeoutMillis / 1000}s 内返回结果，可能仍在等待用户确认")
             )
-        if (result.first) Result.success(Unit) else Result.failure(
-            IllegalStateException(result.second ?: "系统拒绝安装")
-        )
+        if (result.first) {
+            Result.success(Unit)
+        } else {
+            Result.failure(
+                IllegalStateException(result.second ?: "系统拒绝安装")
+            )
+        }
     }
 
     /** 给 [ApkInstallReceiver] 用：把系统回传的结果分发给对应的回调 */

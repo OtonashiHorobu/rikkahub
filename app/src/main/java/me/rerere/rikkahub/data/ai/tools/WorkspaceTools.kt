@@ -222,7 +222,10 @@ private fun createReadFileTool(
             properties = buildJsonObject {
                 put("path", buildJsonObject {
                     put("type", "string")
-                    put("description", "Absolute path inside the workspace, or a path relative to the current working directory.")
+                    put(
+                        "description",
+                        "Absolute path inside the workspace, or a path relative to the current working directory."
+                    )
                 })
                 put("offset", buildJsonObject {
                     put("type", "integer")
@@ -498,7 +501,10 @@ private fun createWriteFileTool(
             properties = buildJsonObject {
                 put("path", buildJsonObject {
                     put("type", "string")
-                    put("description", "Absolute path inside the workspace, or a path relative to the current working directory.")
+                    put(
+                        "description",
+                        "Absolute path inside the workspace, or a path relative to the current working directory."
+                    )
                 })
                 put("text", buildJsonObject {
                     put("type", "string")
@@ -543,7 +549,10 @@ private fun createEditFileTool(
             properties = buildJsonObject {
                 put("path", buildJsonObject {
                     put("type", "string")
-                    put("description", "Absolute path inside the workspace, or a path relative to the current working directory.")
+                    put(
+                        "description",
+                        "Absolute path inside the workspace, or a path relative to the current working directory."
+                    )
                 })
                 put("old_text", buildJsonObject {
                     put("type", "string")
@@ -611,7 +620,9 @@ private fun createShellTool(
     description = buildString {
         append("Run a shell command in the assistant's bound workspace. ")
         append("The workspace files area is at ${paths.workspaceDirDisplay}. ")
-        append("Use cwd for a path relative to the workspace files root; it defaults to the current working directory. ")
+        append(
+            "Use cwd for a path relative to the workspace files root; it defaults to the current working directory. "
+        )
         append("Requires the workspace shell to be installed and ready.")
     },
     parameters = {
@@ -687,7 +698,10 @@ private fun createCdTool(
             properties = buildJsonObject {
                 put("path", buildJsonObject {
                     put("type", "string")
-                    put("description", "Absolute path inside the workspace, or a path relative to the current directory. \".\" or \"/\" resets to the workspace root.")
+                    put(
+                        "description",
+                        "Absolute path inside the workspace, or a path relative to the current directory. \".\" or \"/\" resets to the workspace root."
+                    )
                 })
             },
             required = listOf("path"),

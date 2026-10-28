@@ -38,7 +38,10 @@ internal fun createApkTools(
                 properties = buildJsonObject {
                     put("path", buildJsonObject {
                         put("type", "string")
-                        put("description", "APK path inside the workspace, absolute or relative to the current directory.")
+                        put(
+                            "description",
+                            "APK path inside the workspace, absolute or relative to the current directory."
+                        )
                     })
                 },
                 required = listOf("path"),
@@ -113,7 +116,10 @@ internal fun createApkTools(
                 properties = buildJsonObject {
                     put("path", buildJsonObject {
                         put("type", "string")
-                        put("description", "APK path inside the workspace, absolute or relative to the current directory.")
+                        put(
+                            "description",
+                            "APK path inside the workspace, absolute or relative to the current directory."
+                        )
                     })
                 },
                 required = listOf("path"),

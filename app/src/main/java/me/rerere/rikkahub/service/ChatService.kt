@@ -54,9 +54,9 @@ import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
-import me.rerere.rikkahub.data.model.bindPermissionLevel
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.bindConfig
+import me.rerere.rikkahub.data.model.bindPermissionLevel
 import me.rerere.rikkahub.data.model.cancelInterruptedTools
 import me.rerere.rikkahub.data.model.deleteMessage
 import me.rerere.rikkahub.data.model.editMessage
