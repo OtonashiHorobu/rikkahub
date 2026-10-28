@@ -175,18 +175,27 @@ class StreamChunkHandler(private val model: Model? = null) {
                 }
             }
 
-            is StreamChunk.ToolCallDelta -> copy(parts = parts.map { part ->
+            is StreamChunk.ToolCallDelta -> {
                 // 工具调用可以并行生成，通过 toolCallId 而不是 part 位置识别目标。
-                if (part is UIMessagePart.Tool && part.toolCallId == chunk.id) {
-                    part.copy(
-                        toolName = part.toolName + chunk.toolNameDelta,
-                        input = part.input + chunk.inputDelta,
-                        metadata = chunk.metadata ?: part.metadata,
-                    )
+                // 参数是边生成边长的大字符串，只替换目标 part，不重建整条 parts 列表：
+                // 一次响应里这一步会跑上千次，其余 part 的对象没必要跟着重建。
+                val index = parts.indexOfFirst { it is UIMessagePart.Tool && it.toolCallId == chunk.id }
+                if (index < 0) {
+                    this
                 } else {
-                    part
+                    val target = parts[index] as UIMessagePart.Tool
+                    copy(parts = parts.toMutableList().apply {
+                        set(
+                            index,
+                            target.copy(
+                                toolName = target.toolName + chunk.toolNameDelta,
+                                input = target.input + chunk.inputDelta,
+                                metadata = chunk.metadata ?: target.metadata,
+                            )
+                        )
+                    })
                 }
-            })
+            }
 
             is StreamChunk.ToolCallEnd -> this
             is StreamChunk.ToolCallOutput -> copy(parts = parts.map { part ->

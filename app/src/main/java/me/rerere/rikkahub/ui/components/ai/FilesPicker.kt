@@ -78,6 +78,7 @@ import me.rerere.rikkahub.data.model.lastContextTokens
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
 import me.rerere.rikkahub.ui.components.ui.ExtensionSelector
 import me.rerere.rikkahub.ui.context.LocalNavController
+import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailTab
 import me.rerere.rikkahub.ui.context.LocalSettings
 import me.rerere.rikkahub.ui.hooks.ChatInputState
 import me.rerere.rikkahub.utils.formatNumber
@@ -238,7 +239,13 @@ internal fun FilesPicker(
                             onUpdateAssistant = onUpdateAssistant,
                             onNavigateToDetail = { id ->
                                 onDismiss()
-                                navController.navigate(Screen.WorkspaceDetail(id))
+                                navController.navigate(
+                                    Screen.WorkspaceDetail(
+                                        id = id,
+                                        tab = WorkspaceDetailTab.FILES.route,
+                                        cwd = conversation.workspaceCwd,
+                                    )
+                                )
                             },
                             onNavigateToTerminal = { id ->
                                 onDismiss()
@@ -362,7 +369,6 @@ internal fun FilesPicker(
     if (showCwdSheet && boundWorkspace != null) {
         WorkspaceCwdPickerSheet(
             workspaceId = boundWorkspace.id,
-            workspaceDir = boundWorkspace.workspaceDir(),
             currentCwd = conversation.workspaceCwd,
             onSelectCwd = { newCwd ->
                 onUpdateWorkspaceCwd(newCwd)

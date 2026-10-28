@@ -44,6 +44,7 @@ internal fun Conversation.fork(
         lorebookIds = lorebookIds,
         config = config,
         workspaceCwd = workspaceCwd,
+        workspaceCwdLocked = workspaceCwdLocked,
         folderId = folderId,
     )
 }

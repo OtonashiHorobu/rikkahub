@@ -37,6 +37,7 @@ import me.rerere.rikkahub.data.ai.transformers.transforms
 import me.rerere.rikkahub.data.ai.transformers.visualTransforms
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
+import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MemoryFile
@@ -64,6 +65,8 @@ class ChatTurnContext(
     val conversationId: Uuid,
     val conversationSystemPrompt: String?,
     val workspaceCwd: String?,
+    /** 本轮生效的 Agent 权限等级，会话上的值优先于助手 */
+    val permissionLevel: AgentPermissionLevel,
     val memories: List<MemoryFile>,
     val tools: List<Tool>,
 )
@@ -101,6 +104,7 @@ class ChatRequestFactory(
         val model = settings.getChatModelOf(conversation)
             ?: throw IllegalStateException("No chat model selected")
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
+        val permissionLevel = conversation.config?.permissionLevel ?: assistant.permissionLevel
         return ChatTurnContext(
             settings = settings,
             assistant = assistant,
@@ -109,12 +113,16 @@ class ChatRequestFactory(
             conversationId = conversation.id,
             conversationSystemPrompt = conversation.customSystemPrompt,
             workspaceCwd = conversation.workspaceCwd,
+            permissionLevel = permissionLevel,
             memories = if (assistant.enableMemory) memoryRepository.getFiles(assistant.memoryId) else emptyList(),
             tools = chatToolFactory.createTools(
                 settings = settings,
                 assistant = assistant,
                 model = model,
                 workspaceCwd = conversation.workspaceCwd,
+                conversationId = conversation.id,
+                workspaceCwdLocked = conversation.workspaceCwdLocked,
+                permissionLevel = permissionLevel,
             ),
         )
     }

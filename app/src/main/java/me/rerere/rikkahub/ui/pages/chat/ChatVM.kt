@@ -362,6 +362,18 @@ class ChatVM(
         }
     }
 
+    fun updateConversationPermissionLevel(level: me.rerere.rikkahub.data.model.AgentPermissionLevel?) {
+        viewModelScope.launch {
+            chatService.updateConversationPermissionLevel(_conversationId, level)
+        }
+    }
+
+    fun updateWorkspaceCwdLocked(locked: Boolean) {
+        viewModelScope.launch {
+            chatService.updateWorkspaceCwdLocked(_conversationId, locked)
+        }
+    }
+
     fun toggleMessageFavorite(node: MessageNode) {
         viewModelScope.launch {
             val currentlyFavorited = favoriteRepository.isNodeFavorited(_conversationId, node.id)

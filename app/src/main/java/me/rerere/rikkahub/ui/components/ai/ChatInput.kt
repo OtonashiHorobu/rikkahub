@@ -95,6 +95,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.getQuickMessagesOfAssistant
 import me.rerere.rikkahub.data.files.FilesManager
+import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.service.MessageQueueState
@@ -130,6 +131,9 @@ fun ChatInput(
     completionProviders: List<ChatCompletionProvider> = emptyList(),
     onUpdateChatModel: (Model) -> Unit,
     onUpdateAssistant: (Assistant) -> Unit,
+    // 本轮生效的 Agent 权限等级，按钮本身只负责打开选择面板
+    permissionLevel: AgentPermissionLevel = AgentPermissionLevel.WORKSPACE_WRITE,
+    onClickPermission: () -> Unit = {},
     onMoreClick: () -> Unit,
     onCancelClick: () -> Unit,
     onSendClick: () -> Unit,
@@ -304,6 +308,12 @@ fun ChatInput(
                                     onlyIcon = true,
                                 )
                             }
+
+                            // Agent permissions: three levels, next to the reasoning control
+                            PermissionButton(
+                                level = permissionLevel,
+                                onClick = onClickPermission,
+                            )
 
                         }
 

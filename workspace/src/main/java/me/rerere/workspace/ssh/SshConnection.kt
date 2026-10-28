@@ -275,14 +275,10 @@ internal class SshConnection private constructor(
             // 被取消时放弃等待, 之后建好的连接直接关掉
             val connection = awaitInterruptibly({ open(config) }, onAbandoned = { it.close() })
             return connection.use {
-                val remoteDir = config.remoteDir.trim()
                 SshProbeResult(
                     hostKey = connection.hostKey,
                     homeDir = connection.homeDir,
                     shell = connection.shell,
-                    remoteDirExists = remoteDir.startsWith("/") && connection.sftp { sftp ->
-                        sftp.statOrNull(remoteDir)?.isDir == true
-                    },
                 )
             }
         }

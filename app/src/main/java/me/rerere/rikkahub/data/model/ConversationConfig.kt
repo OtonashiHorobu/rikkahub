@@ -26,16 +26,19 @@ data class ConversationConfig(
     val mcpServers: Set<Uuid> = emptySet(),
     val workspaceId: Uuid? = null,
     val enabledSkills: Set<String> = emptySet(),
+    // 会话固定的 Agent 权限等级, null 表示跟随助手
+    val permissionLevel: AgentPermissionLevel? = null,
 )
 
 // 内置搜索是模型的开关，不在助手上，由调用方另行填入
-private fun Assistant.toConversationConfig() = ConversationConfig(
+internal fun Assistant.toConversationConfig() = ConversationConfig(
     chatModelId = chatModelId,
     reasoningLevel = reasoningLevel,
     enableWebSearch = enableWebSearch,
     mcpServers = mcpServers,
     workspaceId = workspaceId,
     enabledSkills = enabledSkills,
+    permissionLevel = permissionLevel,
 )
 
 private fun Assistant.withConversationConfig(config: ConversationConfig) = copy(
@@ -45,6 +48,7 @@ private fun Assistant.withConversationConfig(config: ConversationConfig) = copy(
     mcpServers = config.mcpServers,
     workspaceId = config.workspaceId,
     enabledSkills = config.enabledSkills,
+    permissionLevel = config.permissionLevel ?: permissionLevel,
 )
 
 /** 会话视角下的助手：会话开始后，会话持有的字段覆盖助手自身的值。 */
@@ -138,4 +142,16 @@ fun Conversation.bindConfig(settings: Settings): Conversation {
         modeInjectionIds = modeInjectionIds.ifEmpty { assistant.modeInjectionIds },
         lorebookIds = lorebookIds.ifEmpty { assistant.lorebookIds },
     )
+}
+
+/**
+ * 只改会话上固定的权限等级。
+ *
+ * 会话还没固定配置时（刚建、还没发过消息），先把助手当前的值固化成一份，再写入等级，
+ * 否则这次修改会跟着助手之后的改动漂移。
+ */
+fun Conversation.bindPermissionLevel(level: AgentPermissionLevel?, settings: Settings): Conversation {
+    val assistant = settings.getAssistantOf(this)
+    val base = config ?: assistant.toConversationConfig()
+    return copy(config = base.copy(permissionLevel = level))
 }

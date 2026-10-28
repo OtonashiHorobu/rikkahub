@@ -8,6 +8,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.db.dao.WorkspaceDAO
@@ -20,6 +22,7 @@ import me.rerere.workspace.RootfsInstallProgress
 import me.rerere.workspace.RootfsInstaller
 import me.rerere.workspace.WorkspaceBackend
 import me.rerere.workspace.WorkspaceCommandResult
+import me.rerere.workspace.WorkspaceSearchMatch
 import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceLayout
 import me.rerere.workspace.WorkspaceManager
@@ -38,6 +41,11 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.uuid.Uuid
+
+private const val FIND_TIMEOUT_MS = 20_000L
+private const val GREP_TIMEOUT_MS = 30_000L
+private const val MAX_GREP_LINE_CHARS = 400
+private const val DIRECTORY_PROBE_TIMEOUT_MS = 10_000L
 
 class WorkspaceRepository(
     private val dao: WorkspaceDAO,
@@ -204,13 +212,47 @@ class WorkspaceRepository(
         }
     }
 
-    /** 工作区在执行环境内的目录约定, 工作区不存在时返回 null */
-    suspend fun layout(id: String): WorkspaceLayout? = dao.getById(id)?.let { workspace ->
-        // 只需要目录约定, 不解密凭据也不建立连接
+    /**
+     * 工作区在执行环境内的目录约定, 工作区不存在时返回 null。
+     *
+     * 远程工作区没有配置里的根目录: 默认目录是登录后的 home, 第一次用到时才连上去问一次并缓存下来。
+     */
+    suspend fun layout(id: String): WorkspaceLayout? {
+        val workspace = dao.getById(id) ?: return null
         if (workspace.isSsh()) {
-            workspace.sshSettings()?.let { SshWorkspaceBackend.layoutOf(it.remoteDir) }
-        } else {
-            manager.layout
+            val settings = workspace.sshSettings() ?: return null
+            return SshWorkspaceBackend.layoutOf(sshHomeDir(workspace, settings))
+        }
+        return manager.layout
+    }
+
+    /** 界面要展示默认目录时用, 避免各处自己解密 SSH 配置 */
+    suspend fun defaultDir(id: String): String? = layout(id)?.workspaceDir
+
+    private val sshHomeMutex = Mutex()
+
+    /**
+     * 远程工作区的 home: 已缓存直接用, 否则用一条临时连接问一次并写回配置。
+     *
+     * 连不上时返回 null (布局退回根目录), 让界面自己报连接错误, 而不是在这里抛。
+     */
+    private suspend fun sshHomeDir(
+        workspace: WorkspaceEntity,
+        settings: SshWorkspaceSettings,
+    ): String? {
+        settings.homeDir?.takeIf { it.startsWith("/") }?.let { return it }
+        return sshHomeMutex.withLock {
+            // 等锁期间别的调用可能已经探测过
+            val latest = dao.getById(workspace.id)?.sshSettings() ?: settings
+            latest.homeDir?.takeIf { it.startsWith("/") }?.let { return@withLock it }
+            val home = runCatching {
+                withContext(Dispatchers.IO) { sshPool.probe(latest.toConnectionConfig()).homeDir }
+            }.getOrNull()?.takeIf { it.startsWith("/") } ?: return@withLock null
+            val updated = latest.copy(homeDir = home)
+            dao.getById(workspace.id)?.let { current ->
+                dao.upsert(current.copy(sshConfig = JsonInstant.encodeToString(updated)))
+            }
+            home
         }
     }
 
@@ -300,6 +342,147 @@ class WorkspaceRepository(
     }
 
     /** 执行命令实际使用的 shell 路径 */
+    /**
+     * 按 glob 模式查找文件, [dir] 是环境内的绝对目录。
+     *
+     * 本地工作区走 [WorkspaceManager.glob]（纯 JVM 遍历, 不需要 shell 就绪）;
+     * SSH 工作区没有本地落点, 退化为 `find` 一条命令。
+     * 返回的 [WorkspaceFileEntry.path] 已经转换成环境内绝对路径。
+     */
+    suspend fun globAbsolute(
+        id: String,
+        dir: String,
+        pattern: String,
+        limit: Int,
+    ): List<WorkspaceFileEntry> {
+        val workspace = dao.getById(id) ?: return emptyList()
+        val layout = layout(id) ?: return emptyList()
+        if (workspace.capabilities().localFiles) {
+            val relative = layout.relativeToWorkspace(dir)
+            return runInterruptible(Dispatchers.IO) {
+                manager.glob(workspace.root, pattern, relative)
+            }.take(limit).map { entry ->
+                entry.copy(path = layout.absolutePath(WorkspaceStorageArea.FILES, entry.path))
+            }
+        }
+        // 没有本地落点: find 取 (mtime, 路径), 按修改时间倒序, 再在本地按 glob 过滤
+        val base = dir.trimEnd('/').ifEmpty { "/" }
+        val command = "find ${shellQuote(base)} -type f -not -path '*/.git/*' " +
+            "-printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n ${limit * 20}"
+        val output = executeCommand(id, command, "", FIND_TIMEOUT_MS)
+        val matcher = globMatcher(pattern)
+        val root = layout.workspaceDir
+        return output.stdout.lineSequence()
+            .mapNotNull { line ->
+                val split = line.indexOf(' ')
+                if (split <= 0) null else line.substring(split + 1).trim()
+            }
+            .filter { it.isNotBlank() }
+            .filter { candidate ->
+                runCatching { matcher.matches(java.nio.file.Paths.get(candidate.removePrefix("$root/"))) }
+                    .getOrDefault(false)
+            }
+            .take(limit)
+            .map { entryOf(it) }
+            .toList()
+    }
+
+    /**
+     * 在 [dir] 下搜索文件内容。[pattern] 默认按字面量匹配, [regex] 为真时按正则。
+     * 返回的 [WorkspaceSearchMatch.path] 已经转换成环境内绝对路径。
+     */
+    suspend fun grepAbsolute(
+        id: String,
+        dir: String,
+        pattern: String,
+        include: String?,
+        limit: Int,
+        regex: Boolean,
+    ): List<WorkspaceSearchMatch> {
+        val workspace = dao.getById(id) ?: return emptyList()
+        val layout = layout(id) ?: return emptyList()
+        if (workspace.capabilities().localFiles) {
+            val relative = layout.relativeToWorkspace(dir)
+            return runInterruptible(Dispatchers.IO) {
+                manager.grep(
+                    root = workspace.root,
+                    query = pattern,
+                    path = relative,
+                    regex = regex,
+                    ignoreCase = true,
+                    includeGlob = include,
+                )
+            }.take(limit).map { match ->
+                match.copy(path = layout.absolutePath(WorkspaceStorageArea.FILES, match.path))
+            }
+        }
+        val base = dir.trimEnd('/').ifEmpty { "/" }
+        val includeArg = include?.takeIf { it.isNotBlank() }?.let { " --include=${shellQuote(it)}" }.orEmpty()
+        val mode = if (regex) "-E" else "-F"
+        val command = "grep -rIn $mode$includeArg --binary-files=without-match " +
+            "--exclude-dir=.git --exclude-dir=node_modules " +
+            "${shellQuote(pattern)} ${shellQuote(base)} 2>/dev/null | head -n $limit"
+        val output = executeCommand(id, command, "", GREP_TIMEOUT_MS)
+        return output.stdout.lineSequence()
+            .mapNotNull { line ->
+                // path:line:text, 路径里可能有冒号, 按最后一个段位切
+                val first = line.indexOf(':')
+                if (first <= 0) return@mapNotNull null
+                val second = line.indexOf(':', first + 1)
+                if (second <= 0) return@mapNotNull null
+                val number = line.substring(first + 1, second).toIntOrNull() ?: return@mapNotNull null
+                WorkspaceSearchMatch(
+                    path = line.substring(0, first),
+                    line = number,
+                    text = line.substring(second + 1).take(MAX_GREP_LINE_CHARS),
+                )
+            }
+            .toList()
+    }
+
+    private fun entryOf(absolutePath: String): WorkspaceFileEntry {
+        val file = File(absolutePath)
+        return WorkspaceFileEntry(
+            path = absolutePath,
+            name = file.name,
+            isDirectory = false,
+            sizeBytes = runCatching { file.length() }.getOrDefault(0L),
+            updatedAt = runCatching { file.lastModified() }.getOrDefault(0L),
+        )
+    }
+
+    private fun globMatcher(pattern: String): java.nio.file.PathMatcher {
+        val fs = java.nio.file.FileSystems.getDefault()
+        val trimmed = pattern.trim()
+        return fs.getPathMatcher("glob:$trimmed")
+    }
+
+    private fun shellQuote(value: String): String = "'" + value.replace("'", "'\''") + "'"
+
+    /**
+     * 判断 [absolutePath] 是不是目录。
+     *
+     * 在文件区内直接列目录；文件区外（例如 /archive/Clone/xxx）无法通过文件浏览器接口访问，
+     * 只能问执行环境的 shell。本地 Rootfs 里没有这个路径时会如实返回 false。
+     */
+    suspend fun isDirectory(id: String, absolutePath: String, relativeToFiles: String): Boolean {
+        if (!absolutePath.contains("..") && !relativeToFiles.startsWith("/")) {
+            val listed = runCatching { listFiles(id, WorkspaceStorageArea.FILES, relativeToFiles) }.getOrNull()
+            if (listed != null) return true
+        }
+        val result = executeCommand(id, "test -d ${shellQuote(absolutePath)}", "", DIRECTORY_PROBE_TIMEOUT_MS)
+        return result.exitCode == 0 && !result.timedOut
+    }
+
+    /** 把 `~` / `~/x` 展开成执行环境里的 HOME */
+    suspend fun expandHome(id: String, path: String): String {
+        // printenv 不需要引号，省掉一层 shell 转义
+        val home = executeCommand(id, "printenv HOME", "", DIRECTORY_PROBE_TIMEOUT_MS)
+            .stdout.trim().trim('"')
+        require(home.startsWith("/")) { "Cannot resolve HOME in this workspace" }
+        return if (path == "~") home else home.trimEnd('/') + "/" + path.removePrefix("~/")
+    }
+
     suspend fun shell(id: String): String = readFromBackend(id) { it.shell() }
 
     /** 按环境内绝对路径写入文本; 本地工作区在 Rootfs 内执行 shell 写入, 因此和命令一样支持取消 */
@@ -372,16 +555,16 @@ class WorkspaceRepository(
     }
 
     /** 打开 SSH 工作区的交互式 shell, 阻塞到连接和 shell 都建立好, 不能在主线程调用 */
-    fun openSshShell(workspace: WorkspaceEntity, columns: Int, rows: Int): SshShell {
+    fun openSshShell(workspace: WorkspaceEntity, columns: Int, rows: Int, cwd: String? = null): SshShell {
         val backend = backendOf(workspace) as? SshWorkspaceBackend
             ?: error("Not an SSH workspace: ${workspace.id}")
-        return backend.openShell(columns, rows)
+        return backend.openShell(columns, rows, cwd)
     }
 
     private fun backendOf(workspace: WorkspaceEntity): WorkspaceBackend =
         if (workspace.isSsh()) {
             val settings = workspace.sshSettings() ?: error("SSH workspace config is missing: ${workspace.id}")
-            SshWorkspaceBackend(sshPool, workspace.id, settings.toConnectionConfig())
+            SshWorkspaceBackend(sshPool, workspace.id, settings.toConnectionConfig(), settings.homeDir)
         } else {
             manager.backend(workspace.root, workspace.shellCompatibilityMode)
         }
@@ -394,17 +577,17 @@ class WorkspaceRepository(
         password = encryptedPassword?.let(::decryptSecret),
         privateKey = encryptedPrivateKey?.let(::decryptSecret),
         passphrase = encryptedPassphrase?.let(::decryptSecret),
-        remoteDir = remoteDir,
         hostKey = hostKey,
     )
 
     /**
      * 表单转成持久化配置并加密凭据。编辑时留空的凭据沿用 [previous] 的密文;
      * 私钥口令跟随私钥: 换了新私钥就以表单为准, 沿用旧私钥时口令留空也沿用。
+     *
+     * 远程工作目录不是配置项: 默认目录是登录后的 home, 会话 cwd 可以随时改,
+     * 所以这里只沿用上一份缓存到的 [SshWorkspaceSettings.homeDir]。
      */
     private fun SshWorkspaceDraft.toSettings(previous: SshWorkspaceSettings?): SshWorkspaceSettings {
-        val remoteDir = remoteDir.trim().trimEnd('/').ifEmpty { "/" }
-        require(remoteDir.startsWith("/")) { "Remote directory must be an absolute path" }
         require(host.isNotBlank()) { "Host is required" }
         require(username.isNotBlank()) { "Username is required" }
         require(port in 1..65535) { "Invalid port: $port" }
@@ -414,7 +597,7 @@ class WorkspaceRepository(
             port = port,
             username = username.trim(),
             authType = authType,
-            remoteDir = remoteDir,
+            homeDir = previous?.homeDir,
             hostKey = hostKey,
             encryptedPassword = if (authType == SshAuthType.PASSWORD) {
                 password.takeIf { it.isNotEmpty() }?.let(SecretCipher::encrypt) ?: previous?.encryptedPassword

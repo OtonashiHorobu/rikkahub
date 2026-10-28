@@ -34,6 +34,8 @@ data class Conversation(
     val config: ConversationConfig? = null,
     // Absolute path inside the workspace rootfs
     val workspaceCwd: String? = null,
+    // 锁定后不给模型 workspace_cd 工具, 只有用户能在聊天页改目录
+    val workspaceCwdLocked: Boolean = false,
     // 所属文件夹（助手内分组），null 表示未归入任何文件夹
     val folderId: Uuid? = null,
     @Transient

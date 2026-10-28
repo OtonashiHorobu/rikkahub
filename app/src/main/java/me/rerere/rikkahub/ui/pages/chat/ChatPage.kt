@@ -3,7 +3,11 @@ package me.rerere.rikkahub.ui.pages.chat
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
@@ -33,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -44,6 +49,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,10 +64,14 @@ import me.rerere.ai.provider.ProviderSetting
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Cancel01
+import me.rerere.hugeicons.stroke.Folder01
+import me.rerere.hugeicons.stroke.FolderOpen
+import me.rerere.hugeicons.stroke.Shield01
 import me.rerere.hugeicons.stroke.LeftToRightListBullet
 import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
 import me.rerere.rikkahub.data.datastore.getSelectedASRProvider
@@ -73,7 +83,10 @@ import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.ui.components.ai.ChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.components.ai.ChatInput
 import me.rerere.rikkahub.ui.components.ai.FilesPicker
+import me.rerere.rikkahub.data.model.AgentPermissionLevel
+import me.rerere.rikkahub.ui.components.ai.PermissionLevelSheet
 import me.rerere.rikkahub.ui.components.ai.SearchMode
+import me.rerere.rikkahub.ui.components.ai.WorkspaceCwdPickerSheet
 import me.rerere.rikkahub.ui.components.ai.completion.WorkspaceCompletionProvider
 import me.rerere.rikkahub.ui.components.ai.rememberChatAttachmentPickerActions
 import me.rerere.rikkahub.ui.context.LocalNavController
@@ -82,6 +95,7 @@ import me.rerere.rikkahub.ui.context.Navigator
 import me.rerere.rikkahub.ui.hooks.ChatInputState
 import me.rerere.rikkahub.ui.hooks.EditStateContent
 import me.rerere.rikkahub.ui.hooks.useEditState
+import me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailTab
 import me.rerere.rikkahub.utils.base64Decode
 import me.rerere.rikkahub.utils.navigateToChatPage
 import org.koin.androidx.compose.koinViewModel
@@ -311,6 +325,50 @@ private fun ChatPageContent(
         }.orEmpty()
     }
 
+    // 顶栏 cwd 标签：工作区名 + 当前目录尾段；模型 cd 之后用户在这里能立刻看到
+    val workspaces by workspaceRepository.listFlow().collectAsStateWithLifecycle(initialValue = emptyList())
+    val boundWorkspace = remember(workspaces, assistant.workspaceId) {
+        workspaces.find { it.id == assistant.workspaceId?.toString() }
+    }
+    // 远程工作区的默认目录要连上才知道, 顶栏标签等它回来再显示相对路径
+    val workspaceDefaultDir by produceState(
+        initialValue = boundWorkspace?.workspaceDir(),
+        boundWorkspace?.id,
+    ) {
+        value = boundWorkspace?.let { workspace ->
+            workspaceRepository.defaultDir(workspace.id) ?: workspace.workspaceDir()
+        }
+    }
+    var showCwdSheet by remember { mutableStateOf(false) }
+    var showPermissionSheet by remember { mutableStateOf(false) }
+    val effectivePermission = conversation.config?.permissionLevel ?: assistant.permissionLevel
+
+    if (showPermissionSheet) {
+        PermissionLevelSheet(
+            selected = conversation.config?.permissionLevel,
+            fallback = assistant.permissionLevel,
+            onSelect = { level ->
+                vm.updateConversationPermissionLevel(level)
+                showPermissionSheet = false
+            },
+            onDismiss = { showPermissionSheet = false },
+        )
+    }
+
+    if (showCwdSheet && boundWorkspace != null) {
+        WorkspaceCwdPickerSheet(
+            workspaceId = boundWorkspace.id,
+            currentCwd = conversation.workspaceCwd,
+            cwdLocked = conversation.workspaceCwdLocked,
+            onUpdateCwdLocked = vm::updateWorkspaceCwdLocked,
+            onSelectCwd = { cwd ->
+                vm.updateWorkspaceCwd(cwd)
+                showCwdSheet = false
+            },
+            onDismiss = { showCwdSheet = false },
+        )
+    }
+
     TTSAutoPlay(vm = vm, setting = setting, conversation = conversation)
 
     Surface(
@@ -325,6 +383,22 @@ private fun ChatPageContent(
                     assistant = assistant,
                     chatModel = currentChatModel,
                     conversation = conversation,
+                    workspaceLabel = boundWorkspace?.let { workspace ->
+                        cwdLabel(workspace.name, workspaceDefaultDir, conversation.workspaceCwd)
+                    },
+                    onClickCwd = { showCwdSheet = true },
+                    // 绑定工作区时给出文件浏览器入口，放在 Chat Options 左边
+                    onOpenWorkspace = boundWorkspace?.let { workspace ->
+                        {
+                            navController.navigate(
+                                Screen.WorkspaceDetail(
+                                    id = workspace.id,
+                                    tab = WorkspaceDetailTab.FILES.route,
+                                    cwd = conversation.workspaceCwd,
+                                )
+                            )
+                        }
+                    },
                     bigScreen = bigScreen,
                     drawerState = drawerState,
                     previewMode = previewMode,
@@ -358,6 +432,8 @@ private fun ChatPageContent(
                     chatModel = currentChatModel,
                     hazeState = hazeState,
                     completionProviders = completionProviders,
+                    permissionLevel = effectivePermission,
+                    onClickPermission = { showPermissionSheet = true },
                     onCancelClick = {
                         vm.stopGeneration()
                     },
@@ -566,6 +642,10 @@ private fun TopBar(
     drawerState: DrawerState,
     bigScreen: Boolean,
     previewMode: Boolean,
+    workspaceLabel: String? = null,
+    onClickCwd: () -> Unit = {},
+    /** 为 null 时不显示文件浏览器按钮（没有绑定工作区） */
+    onOpenWorkspace: (() -> Unit)? = null,
     onClickMenu: () -> Unit,
     onNewChat: () -> Unit,
     onUpdateTitle: (String) -> Unit
@@ -620,10 +700,48 @@ private fun TopBar(
                             )
                         )
                     }
+                    if (workspaceLabel != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (workspaceLabel != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                    modifier = Modifier.clickable(onClick = onClickCwd),
+                                ) {
+                                    Icon(
+                                        imageVector = HugeIcons.Folder01,
+                                        contentDescription = null,
+                                        tint = LocalContentColor.current.copy(0.65f),
+                                        modifier = Modifier.size(10.dp),
+                                    )
+                                    Text(
+                                        text = workspaceLabel,
+                                        overflow = TextOverflow.StartEllipsis,
+                                        maxLines = 1,
+                                        color = LocalContentColor.current.copy(0.65f),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp),
+                                    )
+                                }
+                            }
+
+                        }
+                    }
                 }
             }
         },
         actions = {
+            if (onOpenWorkspace != null) {
+                IconButton(onClick = onOpenWorkspace) {
+                    Icon(
+                        imageVector = HugeIcons.FolderOpen,
+                        contentDescription = stringResource(R.string.chat_page_open_workspace_files),
+                    )
+                }
+            }
+
             IconButton(
                 onClick = {
                     onClickMenu()
@@ -677,4 +795,15 @@ private fun TopBar(
             }
         )
     }
+}
+
+/**
+ * 顶栏的工作目录标签：工作区名 + 当前目录相对工作区根的尾段。
+ * 目录就是工作区根时只显示工作区名。
+ */
+private fun cwdLabel(workspaceName: String, workspaceDir: String?, cwd: String?): String {
+    if (cwd.isNullOrBlank()) return workspaceName
+    val root = workspaceDir?.trimEnd('/').orEmpty()
+    val relative = cwd.removePrefix("$root/").removePrefix(root).trim('/')
+    return if (relative.isEmpty()) workspaceName else "$workspaceName / $relative"
 }

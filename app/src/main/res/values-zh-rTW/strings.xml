@@ -1676,7 +1676,6 @@
   <string name="workspace_detail_ssh_connection">SSH 連線</string>
   <string name="workspace_detail_ssh_address">位址</string>
   <string name="workspace_detail_ssh_config_missing">缺少設定</string>
-  <string name="workspace_detail_ssh_remote_dir">遠端目錄</string>
   <string name="workspace_detail_ssh_host_key">主機金鑰</string>
   <string name="workspace_detail_ssh_host_key_unconfirmed">尚未確認。請先在編輯頁面測試連線，再進行連線</string>
   <string name="workspace_detail_ssh_edit">編輯連線</string>
@@ -1704,8 +1703,6 @@
   <string name="workspace_ssh_editor_passphrase">通行碼</string>
   <string name="workspace_ssh_editor_passphrase_placeholder">若私密金鑰未加密，請留空。</string>
   <string name="workspace_ssh_editor_working_dir">工作目錄</string>
-  <string name="workspace_ssh_editor_remote_dir">遠端目錄</string>
-  <string name="workspace_ssh_editor_remote_dir_desc">AI 預設會在此讀寫檔案並執行命令。留空以在測試連線後使用遠端使用者的主目錄</string>
   <string name="workspace_ssh_editor_security">安全性</string>
   <string name="workspace_ssh_editor_host_key">主機金鑰</string>
   <string name="workspace_ssh_editor_host_key_unconfirmed">尚未確認。測試連線或儲存時，系統會要求您驗證伺服器指紋。</string>
@@ -1718,7 +1715,6 @@
   <string name="workspace_ssh_editor_connected">已連線</string>
   <string name="workspace_ssh_editor_shell">Shell</string>
   <string name="workspace_ssh_editor_home_dir">%1$s（主目錄）</string>
-  <string name="workspace_ssh_editor_dir_missing">%1$s（不存在，首次使用時將建立）</string>
   <string name="workspace_ssh_editor_host_key_changed">主機金鑰已變更</string>
   <string name="workspace_ssh_editor_host_key_confirm">確認主機金鑰</string>
   <string name="workspace_ssh_editor_host_key_changed_message">%1$s 所提供的主機金鑰與您先前信任的金鑰不符。伺服器可能已重新安裝，或有人正在冒充它（中間人攻擊）。在您驗證之前，請勿繼續。</string>
@@ -1727,7 +1723,6 @@
   <string name="workspace_ssh_editor_trust_continue">信任並繼續</string>
   <string name="workspace_ssh_editor_not_found">工作區不存在，或不是 SSH 工作區</string>
   <string name="workspace_ssh_editor_missing_fields">請輸入主機、連接埠與使用者名稱</string>
-  <string name="workspace_ssh_editor_missing_remote_dir">輸入遠端工作目錄</string>
   <string name="workspace_ssh_editor_save_failed">儲存失敗</string>
   <string name="skills_page_invalid_dirs_title">無法辨識的資料夾</string>
   <string name="skills_page_invalid_reason_missing_skill_md">缺少 SKILL.md</string>

@@ -40,6 +40,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.ai.provider.ModelType
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
+import me.rerere.rikkahub.ui.components.ai.PermissionLevelSheet
+import me.rerere.rikkahub.ui.components.ai.permissionLevelDescription
+import me.rerere.rikkahub.ui.components.ai.permissionLevelLabel
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.ui.components.ai.ModelField
 import me.rerere.rikkahub.ui.components.ai.ModelListSheet
@@ -120,6 +123,19 @@ internal fun AssistantBasicContent(
         state = modelListState,
         onSelect = { onUpdate(assistant.copy(chatModelId = it.id)) },
     )
+
+    var showPermissionSheet by remember { mutableStateOf(false) }
+    if (showPermissionSheet) {
+        PermissionLevelSheet(
+            selected = assistant.permissionLevel,
+            fallback = assistant.permissionLevel,
+            onSelect = { level ->
+                if (level != null) onUpdate(assistant.copy(permissionLevel = level))
+                showPermissionSheet = false
+            },
+            onDismiss = { showPermissionSheet = false },
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -202,6 +218,18 @@ internal fun AssistantBasicContent(
                     },
                 )
             }
+            item(
+                headlineContent = { Text(stringResource(R.string.permission_level_title)) },
+                supportingContent = { Text(permissionLevelDescription(assistant.permissionLevel)) },
+                trailingContent = {
+                    Text(
+                        text = permissionLevelLabel(assistant.permissionLevel),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                onClick = { showPermissionSheet = true },
+            )
             switchItem(
                 checked = assistant.useAssistantAvatar,
                 onCheckedChange = {

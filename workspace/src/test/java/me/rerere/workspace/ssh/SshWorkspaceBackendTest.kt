@@ -148,7 +148,6 @@ class SshWorkspaceBackendTest {
         username = USER,
         authType = SshAuthType.PASSWORD,
         password = PASSWORD,
-        remoteDir = remoteDir.path,
         hostKey = hostKey,
     )
 
@@ -159,8 +158,11 @@ class SshWorkspaceBackendTest {
         return config(hostKey)
     }
 
-    private fun backend(config: SshConnectionConfig = trustedConfig(), pool: SshConnectionPool = this.pool) =
-        SshWorkspaceBackend(pool, WORKSPACE_ID, config)
+    private fun backend(
+        config: SshConnectionConfig = trustedConfig(),
+        homeDir: String? = remoteDir.path,
+        pool: SshConnectionPool = this.pool,
+    ) = SshWorkspaceBackend(pool, WORKSPACE_ID, config, homeDir = homeDir)
 
     @Test
     fun unknownHostKeyIsRejectedUntilTrusted() {
@@ -171,7 +173,7 @@ class SshWorkspaceBackendTest {
 
         val result = pool.probe(config(hostKey))
         assertEquals(hostKey, result.hostKey)
-        assertTrue(result.remoteDirExists)
+        assertTrue(result.homeDir.startsWith("/"))
         assertTrue(result.shell.startsWith("/"))
     }
 
@@ -203,7 +205,6 @@ class SshWorkspaceBackendTest {
             username = KEY_USER,
             authType = SshAuthType.PRIVATE_KEY,
             privateKey = privateKey,
-            remoteDir = remoteDir.path,
             hostKey = hostKey,
         )
         assertEquals(hostKey, pool.probe(config).hostKey)
@@ -274,12 +275,16 @@ class SshWorkspaceBackendTest {
     }
 
     @Test
-    fun missingWorkspaceDirectoryIsCreatedOnFirstUse() {
-        val nested = File(remoteDir, "not/yet")
-        val backend = backend(trustedConfig().copy(remoteDir = nested.path))
+    fun absolutePathsAreUsedAsIsAndRelativePathsJoinHome() {
+        val backend = backend()
+        File(remoteDir, "notes").mkdirs()
+        File(remoteDir, "notes/a.txt").writeText("hello")
 
-        assertEquals(emptyList<Any>(), backend.listFiles(WorkspaceStorageArea.FILES, ""))
-        assertTrue(nested.isDirectory)
+        assertEquals("hello", backend.readText("notes/a.txt"))
+        // 会话 cwd 可以是机器上任意目录, 文件区按绝对路径寻址
+        assertEquals("hello", backend.readText("${remoteDir.path}/notes/a.txt"))
+        val entries = backend.listFiles(WorkspaceStorageArea.FILES, remoteDir.path)
+        assertTrue(entries.any { it.name == "notes" && it.path == "${remoteDir.path}/notes" })
     }
 
     @Test
@@ -498,7 +503,7 @@ class SshWorkspaceBackendTest {
         val failure = AtomicReference<Throwable>()
         val worker = thread {
             try {
-                backend(config, closingPool).executeCommand("true", "", 10_000, null)
+                backend(config, pool = closingPool).executeCommand("true", "", 10_000, null)
             } catch (e: Throwable) {
                 failure.set(e)
             }

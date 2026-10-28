@@ -45,7 +45,7 @@ class WorkspaceSshEditorVM(
                             port = settings.port.toString(),
                             username = settings.username,
                             authType = settings.authType,
-                            remoteDir = settings.remoteDir,
+                            homeDir = settings.homeDir,
                             hostKey = settings.hostKey,
                             hasSavedPassword = settings.encryptedPassword != null,
                             hasSavedPrivateKey = settings.encryptedPrivateKey != null,
@@ -112,10 +112,8 @@ class WorkspaceSshEditorVM(
         viewModelScope.launch {
             try {
                 val result = repository.probeSsh(id, draft)
-                // 没填工作目录时默认用远程用户的主目录
-                val tested = draft.copy(remoteDir = draft.remoteDir.ifBlank { result.homeDir })
-                _state.update { it.copy(testing = false, probeResult = result, remoteDir = tested.remoteDir) }
-                if (saveAfter) persist(tested)
+                _state.update { it.copy(testing = false, probeResult = result, homeDir = result.homeDir) }
+                if (saveAfter) persist(draft)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SshUnknownHostKeyException) {
@@ -140,10 +138,6 @@ class WorkspaceSshEditorVM(
     }
 
     private fun persist(draft: SshWorkspaceDraft) {
-        if (draft.remoteDir.isBlank()) {
-            _state.update { it.copy(error = SshEditorError.Resource(R.string.workspace_ssh_editor_missing_remote_dir)) }
-            return
-        }
         _state.update { it.copy(saving = true) }
         viewModelScope.launch {
             try {
@@ -176,7 +170,6 @@ class WorkspaceSshEditorVM(
             password = password,
             privateKey = privateKey,
             passphrase = passphrase,
-            remoteDir = remoteDir.trim(),
             hostKey = hostKey,
         )
     }
@@ -192,7 +185,8 @@ data class WorkspaceSshEditorState(
     val password: String = "",
     val privateKey: String = "",
     val passphrase: String = "",
-    val remoteDir: String = "",
+    /** 登录后的主目录: 保存过的配置直接展示, 测试连接后是刚问到的值 */
+    val homeDir: String? = null,
     val hostKey: SshHostKey? = null,
     // 编辑已有工作区时, 已保存的凭据可以留空沿用
     val hasSavedPassword: Boolean = false,

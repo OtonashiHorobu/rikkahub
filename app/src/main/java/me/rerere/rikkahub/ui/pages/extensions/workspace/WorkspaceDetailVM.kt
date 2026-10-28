@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.repository.WorkspaceRepository
+import me.rerere.rikkahub.ui.pages.extensions.workspace.browser.CONTENT_SEARCH_LIMIT
+import me.rerere.rikkahub.ui.pages.extensions.workspace.browser.ContentSearchMatch
 import me.rerere.workspace.RootfsInstallProgress
 import me.rerere.workspace.RootfsInstallStage
 import me.rerere.workspace.WorkspaceCommandResult
@@ -32,9 +34,16 @@ class WorkspaceDetailVM(
     private val id: String,
     private val repository: WorkspaceRepository,
     private val terminalSessionManager: WorkspaceTerminalSessionManager,
+    /** 从聊天页进来时的会话 cwd: 文件浏览器直接停在它上面 */
+    private val initialCwd: String? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(WorkspaceDetailState())
     val state = _state.asStateFlow()
+
+    private val _contentSearch = MutableStateFlow(ContentSearchState())
+    val contentSearch = _contentSearch.asStateFlow()
+
+    private var searchJob: Job? = null
 
     private var pendingExport: Pair<WorkspaceStorageArea, List<WorkspaceFileEntry>>? = null
 
@@ -127,11 +136,30 @@ class WorkspaceDetailVM(
     }
 
     init {
-        loadWorkspace()
-        refresh()
+        viewModelScope.launch {
+            loadWorkspace()
+            applyInitialCwd()
+            refresh()
+        }
+    }
+
+    /**
+     * 默认落在会话 cwd 上; 本地工作区用相对文件区的路径, 远程工作区直接存绝对路径。
+     * 远程工作区没有 cwd 时落在默认目录 (登录后的 home), 面包屑才有东西可显示。
+     */
+    private fun applyInitialCwd() {
+        val layout = state.value.layout ?: return
+        val cwd = initialCwd?.takeIf { it.startsWith("/") }
+        val path = when {
+            cwd != null -> if (layout.absolutePaths) cwd else layout.relativeToWorkspace(cwd)
+            layout.absolutePaths -> layout.workspaceDir
+            else -> return
+        }
+        _state.update { it.copy(area = WorkspaceStorageArea.FILES, path = path) }
     }
 
     fun selectArea(area: WorkspaceStorageArea) {
+        cancelContentSearch()
         _state.update {
             it.copy(
                 area = area,
@@ -145,21 +173,92 @@ class WorkspaceDetailVM(
 
     fun open(entry: WorkspaceFileEntry) {
         if (!entry.isDirectory) return
-        _state.update { it.copy(path = entry.path, entries = emptyList(), error = null) }
-        refresh()
+        navigate(entry.path)
     }
 
     fun goUp() {
         val path = state.value.path
         if (path.isBlank()) return
-        _state.update {
-            it.copy(
-                path = path.substringBeforeLast('/', missingDelimiterValue = ""),
-                entries = emptyList(),
-                error = null,
-            )
-        }
+        val parent = path.trimEnd('/').substringBeforeLast('/', missingDelimiterValue = "")
+        // 远程工作区的路径是绝对路径, 空串会被当成 home, 所以上一层是 /
+        val target = if (parent.isEmpty() && state.value.layout?.absolutePaths == true) "/" else parent
+        if (target == path) return
+        navigate(target)
+    }
+
+    /** 跳到当前存储区内的某个相对路径，面包屑和「显示更多」都用它 */
+    fun navigate(path: String) {
+        if (path == state.value.path) return
+        cancelContentSearch()
+        _state.update { it.copy(path = path, entries = emptyList(), error = null) }
         refresh()
+    }
+
+    /**
+     * 在当前目录下搜文件内容。UI 先做 250ms 防抖，这里只负责取消上一次请求，
+     * 免得远程工作区上旧结果晚到把新结果盖掉。
+     */
+    fun searchContent(query: String) {
+        searchJob?.cancel()
+        val needle = query.trim()
+        if (needle.isEmpty()) {
+            _contentSearch.value = ContentSearchState()
+            return
+        }
+        searchJob = viewModelScope.launch {
+            _contentSearch.update {
+                it.copy(query = needle, loading = true, error = null, matches = emptyList(), truncated = false)
+            }
+            try {
+                val layout = state.value.layout
+                if (layout == null) error("工作区不可用")
+                val area = state.value.area
+                val matches = repository.grepAbsolute(
+                    id = id,
+                    dir = layout.absolutePath(area, state.value.path),
+                    pattern = needle,
+                    include = null,
+                    limit = CONTENT_SEARCH_LIMIT,
+                    regex = false,
+                )
+                val relative = matches.mapNotNull { match ->
+                    val path = when (area) {
+                        // 远程工作区的路径本来就是绝对路径, 只需要把本地工作区的前缀折掉
+                        WorkspaceStorageArea.FILES -> if (layout.absolutePaths) {
+                            match.path
+                        } else {
+                            layout.relativeToWorkspace(match.path)
+                                .takeIf { relative -> relative != match.path }
+                        }
+
+                        WorkspaceStorageArea.LINUX -> match.path.removePrefix("/")
+                    } ?: return@mapNotNull null
+                    ContentSearchMatch(
+                        path = path,
+                        line = match.line,
+                        text = match.text.trim().take(MAX_CONTENT_MATCH_CHARS),
+                    )
+                }
+                _contentSearch.update {
+                    it.copy(
+                        matches = relative,
+                        loading = false,
+                        truncated = matches.size >= CONTENT_SEARCH_LIMIT,
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _contentSearch.update {
+                    it.copy(loading = false, error = error.message ?: "内容搜索失败")
+                }
+            }
+        }
+    }
+
+    private fun cancelContentSearch() {
+        searchJob?.cancel()
+        _contentSearch.value = ContentSearchState()
     }
 
     private var refreshJob: Job? = null
@@ -244,6 +343,10 @@ class WorkspaceDetailVM(
         entry: WorkspaceFileEntry,
         area: WorkspaceStorageArea,
     ): File? = repository.resolveFile(id, area, entry.path)
+
+    /** 文件浏览器的只读快速预览，大小上限由仓库层把关 */
+    suspend fun readPreview(entry: WorkspaceFileEntry): String =
+        repository.readTextForPreview(id, state.value.area, entry.path)
 
     /**
      * 把当前区域下的文件导出到 cacheDir 的临时文件, 完成后回调 [onReady].
@@ -362,12 +465,10 @@ class WorkspaceDetailVM(
         _terminalState.update { it.copy(history = emptyList()) }
     }
 
-    private fun loadWorkspace() {
-        viewModelScope.launch {
-            val workspace = repository.getById(id)
-            val layout = repository.layout(id)
-            _state.update { it.copy(workspace = workspace, layout = layout) }
-        }
+    private suspend fun loadWorkspace() {
+        val workspace = repository.getById(id)
+        val layout = repository.layout(id)
+        _state.update { it.copy(workspace = workspace, layout = layout) }
     }
 }
 
@@ -384,6 +485,18 @@ data class WorkspaceDetailState(
     val exportTotal: Int = 0,
     val exportResult: String? = null,
 )
+
+/** 内容搜索的 UI 状态；[matches] 里的路径是相对当前存储区的路径 */
+data class ContentSearchState(
+    val query: String = "",
+    val loading: Boolean = false,
+    val matches: List<ContentSearchMatch> = emptyList(),
+    val truncated: Boolean = false,
+    val error: String? = null,
+)
+
+/** 单条命中最多展示这么多字符，日志里的超长行不该占满屏幕 */
+private const val MAX_CONTENT_MATCH_CHARS = 200
 
 data class WorkspaceTerminalState(
     val input: String = "",

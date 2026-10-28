@@ -52,7 +52,9 @@ import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FilesManager
+import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.bindPermissionLevel
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.bindConfig
 import me.rerere.rikkahub.data.model.cancelInterruptedTools
@@ -114,7 +116,7 @@ class ChatService(
     val mcpManager: McpManager,
     private val filesManager: FilesManager,
     private val folderRepository: FolderRepository,
-) {
+) : me.rerere.rikkahub.data.ai.tools.ConversationCwdWriter {
     /** 一轮生成的结果 */
     private sealed interface TurnResult {
         data class Finished(val reason: AgentFinishReason) : TurnResult
@@ -953,6 +955,29 @@ class ChatService(
     }
 
     // 工作目录和配置一起按列落库；还没落过库的新会话先留在内存里，发出第一条消息时一起写入
+    override suspend fun setCwd(conversationId: Uuid, cwd: String?) = updateWorkspaceCwd(conversationId, cwd)
+
+    /** 改会话上的 Agent 权限等级；传 null 表示跟随助手 */
+    suspend fun updateConversationPermissionLevel(conversationId: Uuid, level: AgentPermissionLevel?) {
+        withLoadedSession(conversationId) { session ->
+            val settings = settingsStore.awaitLoaded()
+            session.updateMetadata(
+                transform = { it.bindPermissionLevel(level, settings) },
+                persist = conversationRepo::updateConversationConfig,
+            )
+        }
+    }
+
+    /** 锁定/解锁模型自己切目录 */
+    suspend fun updateWorkspaceCwdLocked(conversationId: Uuid, locked: Boolean) {
+        withLoadedSession(conversationId) { session ->
+            session.updateMetadata(
+                transform = { it.copy(workspaceCwdLocked = locked) },
+                persist = conversationRepo::updateConversationConfig,
+            )
+        }
+    }
+
     suspend fun updateWorkspaceCwd(conversationId: Uuid, workspaceCwd: String?) {
         withLoadedSession(conversationId) { session ->
             session.updateMetadata(

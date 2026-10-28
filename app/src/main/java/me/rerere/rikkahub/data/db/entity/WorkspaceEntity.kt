@@ -11,7 +11,6 @@ import me.rerere.workspace.WorkspaceCapabilities
 import me.rerere.workspace.WorkspaceManager
 import me.rerere.workspace.WorkspaceShellStatus
 import me.rerere.workspace.WorkspaceType
-import me.rerere.workspace.ssh.SshWorkspaceBackend
 
 @Entity(
     tableName = "workspaces",
@@ -55,10 +54,14 @@ data class WorkspaceEntity(
         runCatching { JsonInstant.decodeFromString<SshWorkspaceSettings>(config) }.getOrNull()
     }
 
-    /** 工作区文件目录在执行环境内的绝对路径, 不需要连接即可得到, 供界面展示 */
-    fun workspaceDir(): String =
+    /**
+     * 工作区默认目录在执行环境内的绝对路径, 不需要连接即可得到, 供界面展示。
+     *
+     * 远程工作区没有配置项的根目录: 默认是登录后的 home, 还没连过时为 null 由调用方兜底。
+     */
+    fun workspaceDir(): String? =
         if (isSsh()) {
-            sshSettings()?.let { SshWorkspaceBackend.layoutOf(it.remoteDir).workspaceDir } ?: "/"
+            sshSettings()?.homeDir
         } else {
             WorkspaceManager.ROOTFS_WORKSPACE_DIR
         }

@@ -1676,7 +1676,6 @@
   <string name="workspace_detail_ssh_connection">اتصال SSH</string>
   <string name="workspace_detail_ssh_address">العنوان</string>
   <string name="workspace_detail_ssh_config_missing">التكوين مفقود</string>
-  <string name="workspace_detail_ssh_remote_dir">الدليل البعيد</string>
   <string name="workspace_detail_ssh_host_key">مفتاح المضيف</string>
   <string name="workspace_detail_ssh_host_key_unconfirmed">لم يتم التأكيد بعد. اختبر الاتصال في صفحة التعديل قبل الاتصال</string>
   <string name="workspace_detail_ssh_edit">تعديل الاتصال</string>
@@ -1704,8 +1703,6 @@
   <string name="workspace_ssh_editor_passphrase">عبارة المرور</string>
   <string name="workspace_ssh_editor_passphrase_placeholder">اتركه فارغًا إذا لم يكن المفتاح الخاص مشفّرًا</string>
   <string name="workspace_ssh_editor_working_dir">دليل العمل</string>
-  <string name="workspace_ssh_editor_remote_dir">المجلد البعيد</string>
-  <string name="workspace_ssh_editor_remote_dir_desc">يقرأ الذكاء الاصطناعي الملفات ويكتبها وينفّذ الأوامر هنا افتراضيًا. اتركه فارغًا لاستخدام الدليل الرئيسي للمستخدم البعيد بعد اختبار الاتصال</string>
   <string name="workspace_ssh_editor_security">الأمان</string>
   <string name="workspace_ssh_editor_host_key">مفتاح المضيف</string>
   <string name="workspace_ssh_editor_host_key_unconfirmed">لم يتم التأكيد بعد. سيُطلب منك التحقق من بصمة الخادم عند اختبار الاتصال أو الحفظ</string>
@@ -1718,7 +1715,6 @@
   <string name="workspace_ssh_editor_connected">متصل</string>
   <string name="workspace_ssh_editor_shell">Shell</string>
   <string name="workspace_ssh_editor_home_dir">%1$s (الدليل الرئيسي)</string>
-  <string name="workspace_ssh_editor_dir_missing">%1$s (غير موجود، وسيتم إنشاؤه عند أول استخدام)</string>
   <string name="workspace_ssh_editor_host_key_changed">تم تغيير مفتاح المضيف</string>
   <string name="workspace_ssh_editor_host_key_confirm">تأكيد مفتاح المضيف</string>
   <string name="workspace_ssh_editor_host_key_changed_message">مفتاح المضيف الذي يقدّمه %1$s لا يطابق المفتاح الذي وثقت به سابقًا. ربما أُعيد تثبيت الخادم، أو قد ينتحل شخص ما هويته (هجوم الوسيط). لا تُتابع حتى تتحقق منه.</string>
@@ -1727,7 +1723,6 @@
   <string name="workspace_ssh_editor_trust_continue">الثقة والمتابعة</string>
   <string name="workspace_ssh_editor_not_found">مساحة العمل غير موجودة أو ليست مساحة عمل SSH</string>
   <string name="workspace_ssh_editor_missing_fields">أدخل المضيف والمنفذ واسم المستخدم</string>
-  <string name="workspace_ssh_editor_missing_remote_dir">أدخل دليل العمل البعيد</string>
   <string name="workspace_ssh_editor_save_failed">تعذّر الحفظ</string>
   <string name="skills_page_invalid_dirs_title">مجلدات غير معروفة</string>
   <string name="skills_page_invalid_reason_missing_skill_md">SKILL.md مفقود</string>

@@ -248,10 +248,10 @@ private fun buildSshWorkspacePrompt(
         "You have access to a persistent remote workspace named \"${workspace.name}\" on a real machine, reached over SSH as `$address`."
     )
     appendLine(
-        "- The workspace directory is `${layout.workspaceDir}`. Use it as your working directory; files written there persist across turns of this conversation."
+        "- `${layout.workspaceDir}` is the remote user's home directory. It is the default working directory when the conversation has not picked one; files written there persist across turns."
     )
     appendLine(
-        "- All paths passed to workspace tools must be absolute paths on the remote machine (for example `${layout.workspaceDir}/notes.md`)."
+        "- All paths passed to workspace tools must be absolute paths on the remote machine (for example `${layout.workspaceDir}/notes.md`). The user or you (via `workspace_cd`) can move the working directory anywhere on the machine."
     )
     appendLine(
         "- This is not a sandbox: commands run with the SSH user's real permissions and can affect other data and services on the machine. Avoid destructive or system-wide changes unless the user asks for them."

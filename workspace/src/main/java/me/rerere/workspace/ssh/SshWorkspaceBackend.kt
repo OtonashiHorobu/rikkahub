@@ -9,6 +9,7 @@ import me.rerere.workspace.WorkspaceConfig
 import me.rerere.workspace.WorkspaceFileEntry
 import me.rerere.workspace.WorkspaceLayout
 import me.rerere.workspace.WorkspaceStorageArea
+import me.rerere.workspace.normalizeAbsolutePath
 import me.rerere.workspace.shellQuote
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -20,16 +21,20 @@ import java.io.OutputStream
 /**
  * 远程 SSH 主机上的工作区: 文件走 SFTP, 命令走 exec channel。
  *
- * 存储区映射: [WorkspaceStorageArea.FILES] 为远程工作目录, [WorkspaceStorageArea.LINUX] 为远程根目录。
+ * 没有"工作区根目录"这种配置: 默认目录是登录后的 home ([homeDir]), 会话 cwd 可以指到机器上任意位置,
+ * 所以 [WorkspaceStorageArea.FILES] 按绝对路径寻址 (相对路径以 home 为基准),
+ * [WorkspaceStorageArea.LINUX] 仍然是远程根目录。
  */
 class SshWorkspaceBackend(
     private val pool: SshConnectionPool,
     private val id: String,
     private val config: SshConnectionConfig,
+    homeDir: String? = null,
     private val workspaceConfig: WorkspaceConfig = WorkspaceConfig(),
 ) : WorkspaceBackend {
-    override val layout = layoutOf(config.remoteDir)
+    override val layout = layoutOf(homeDir)
 
+    /** 没有 cwd 时的落脚点: 登录后的 home, 未知时退回根目录 */
     private val workspaceDir = layout.workspaceDir
 
     override fun shell(): String = pool.use(id, config, retry = true) { it.shell }
@@ -161,7 +166,6 @@ class SshWorkspaceBackend(
     ): WorkspaceCommandResult {
         val workingDir = normalizeAbsolute(layout.absolutePath(WorkspaceStorageArea.FILES, cwd))
         return pool.use(id, config, retry = false) { connection ->
-            connection.ensureDir(workspaceDir)
             // 远程登录 shell 不一定是 POSIX shell, 统一交给探测到的 shell 执行;
             // 命令通过位置参数传入, eval "$2" 对命令文本只求值一次
             val remoteCommand = listOf(
@@ -181,53 +185,60 @@ class SshWorkspaceBackend(
         }
     }
 
-    /** 打开交互式终端: 在工作目录下启动用户的登录 shell */
-    fun openShell(columns: Int, rows: Int): SshShell =
+    /** 打开交互式终端: 在 [cwd] (没有时用 home) 下启动用户的登录 shell */
+    fun openShell(columns: Int, rows: Int, cwd: String? = null): SshShell =
         pool.openShell(id, config) { connection, onClose ->
-            connection.ensureDir(workspaceDir)
+            val workingDir = cwd?.takeIf { it.startsWith("/") } ?: workspaceDir
             // 外层交给探测到的 POSIX shell 解析, 再 exec 用户自己的登录 shell ($SHELL 缺失时退回探测结果)
             val remoteCommand = listOf(
                 connection.shell,
                 "-c",
                 "cd -- \"\$1\"; exec \"\${SHELL:-\$0}\" -l",
                 connection.shell,
-                workspaceDir,
+                workingDir,
             ).joinToString(" ") { it.shellQuote() }
             connection.openShell(remoteCommand, columns, rows, onClose)
         }
 
-    /** 文件区操作前确保远程工作目录存在, 和本地工作区自动创建目录的行为一致 */
     private fun <T> withSftp(area: WorkspaceStorageArea, retry: Boolean, block: (ChannelSftp) -> T): T =
-        pool.use(id, config, retry) { connection ->
-            if (area == WorkspaceStorageArea.FILES) connection.ensureDir(workspaceDir)
-            connection.sftp(block)
-        }
+        pool.use(id, config, retry) { connection -> connection.sftp(block) }
 
     private fun areaRoot(area: WorkspaceStorageArea): String = when (area) {
         WorkspaceStorageArea.FILES -> workspaceDir
         WorkspaceStorageArea.LINUX -> "/"
     }
 
+    /**
+     * 文件区没有固定边界: 绝对路径原样使用, 相对路径按 home 拼。
+     * 能不能读、能不能写由远端权限和工具审批决定, 不在这一层拦截。
+     */
     private fun resolve(area: WorkspaceStorageArea, path: String): String {
+        val cleaned = path.replace('\\', '/').trim()
+        if (cleaned.startsWith("/")) return normalizeAbsolute(cleaned)
+        val relative = cleaned.trimStart('/')
         val root = areaRoot(area)
-        val relative = path.replace('\\', '/').trim().trimStart('/')
-        val resolved = normalizeAbsolute(if (relative.isEmpty()) root else "$root/$relative")
-        require(root == "/" || resolved == root || resolved.startsWith("$root/")) {
-            "Path escapes workspace root: $path"
-        }
-        return resolved
+        return normalizeAbsolute(if (relative.isEmpty()) root else "$root/$relative")
     }
 
     private fun relativePath(area: WorkspaceStorageArea, path: String): String =
-        path.removePrefix(areaRoot(area)).trimStart('/')
+        if (area == WorkspaceStorageArea.FILES && layout.absolutePaths) {
+            path
+        } else {
+            path.removePrefix(areaRoot(area)).trimStart('/')
+        }
 
     companion object {
-        /** 不需要连接即可得到的目录约定, 供界面展示路径使用 */
-        fun layoutOf(remoteDir: String): WorkspaceLayout {
-            val workspaceDir = normalizeAbsolute(remoteDir)
+        /**
+         * 不需要连接即可得到的目录约定: 默认目录是登录后的 home, 还不知道时退回根目录。
+         * 文件区按绝对路径寻址, 所以 home 只决定"没有 cwd 时的落脚点"。
+         */
+        fun layoutOf(homeDir: String?): WorkspaceLayout {
+            val home = homeDir?.trim()?.takeIf { it.startsWith("/") }?.let(::normalizeAbsolute)
+            val workspaceDir = home ?: "/"
             return WorkspaceLayout(
                 workspaceDir = workspaceDir,
-                writableRoots = listOf(workspaceDir, "/tmp"),
+                writableRoots = listOfNotNull(home?.takeIf { it != "/" }, "/tmp"),
+                absolutePaths = true,
             )
         }
     }
@@ -316,15 +327,7 @@ internal fun normalizeAbsolute(path: String): String {
     val normalized = path.replace('\\', '/').trim()
     require(normalized.startsWith("/")) { "Path must be absolute: $path" }
     require(!normalized.contains('\u0000')) { "Path contains invalid character" }
-    val segments = ArrayDeque<String>()
-    normalized.split('/').forEach { segment ->
-        when (segment) {
-            "", "." -> Unit
-            ".." -> segments.removeLastOrNull()
-            else -> segments.addLast(segment)
-        }
-    }
-    return "/" + segments.joinToString("/")
+    return normalizeAbsolutePath(normalized)
 }
 
 private fun String.child(name: String): String = if (this == "/") "/$name" else "$this/$name"

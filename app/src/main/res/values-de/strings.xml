@@ -1639,7 +1639,6 @@
   <string name="workspace_detail_ssh_connection">SSH-Verbindung</string>
   <string name="workspace_detail_ssh_address">Adresse</string>
   <string name="workspace_detail_ssh_config_missing">Konfiguration fehlt</string>
-  <string name="workspace_detail_ssh_remote_dir">Remote-Verzeichnis</string>
   <string name="workspace_detail_ssh_host_key">Host-Schlüssel</string>
   <string name="workspace_detail_ssh_host_key_unconfirmed">Noch nicht bestätigt. Teste die Verbindung auf der Bearbeitungsseite, bevor du dich verbindest</string>
   <string name="workspace_detail_ssh_edit">Verbindung bearbeiten</string>
@@ -1680,7 +1679,6 @@
   <string name="workspace_ssh_editor_trust_continue">Vertrauen und fortfahren</string>
   <string name="workspace_ssh_editor_not_found">Der Arbeitsbereich existiert nicht oder ist kein SSH-Arbeitsbereich</string>
   <string name="workspace_ssh_editor_missing_fields">Gib Host, Port und Benutzername ein</string>
-  <string name="workspace_ssh_editor_missing_remote_dir">Gib das Remote-Arbeitsverzeichnis ein</string>
   <string name="workspace_ssh_editor_save_failed">Speichern fehlgeschlagen</string>
   <string name="skills_page_invalid_dirs_title">Nicht erkannte Ordner</string>
   <string name="skills_page_invalid_reason_missing_skill_md">SKILL.md fehlt</string>
@@ -1697,8 +1695,6 @@
   <string name="setting_provider_page_usage_limit_hours">%1$d-Stunden-Limit</string>
   <string name="setting_provider_page_usage_limit_minutes">%1$d-Minuten-Limit</string>
   <string name="setting_provider_page_quota_variables">Variablen: %1$s. Der API-Schlüssel wird mit den oben genannten Headern an diese URL gesendet.</string>
-  <string name="workspace_ssh_editor_remote_dir">Remote-Verzeichnis</string>
-  <string name="workspace_ssh_editor_remote_dir_desc">Die KI liest und schreibt hier standardmäßig Dateien und führt Befehle aus. Lass das Feld leer, um nach dem Testen der Verbindung das Home-Verzeichnis des Remote-Benutzers zu verwenden</string>
   <string name="workspace_ssh_editor_security">Sicherheit</string>
   <string name="workspace_ssh_editor_host_key">Hostschlüssel</string>
   <string name="workspace_ssh_editor_host_key_unconfirmed">Noch nicht bestätigt. Du wirst gebeten, den Server-Fingerabdruck beim Testen der Verbindung oder beim Speichern zu überprüfen</string>
@@ -1727,7 +1723,6 @@
   <string name="workspace_ssh_editor_connected">Verbunden</string>
   <string name="workspace_ssh_editor_shell">Shell</string>
   <string name="workspace_ssh_editor_home_dir">%1$s (Home-Verzeichnis)</string>
-  <string name="workspace_ssh_editor_dir_missing">%1$s (existiert nicht, wird bei erster Verwendung erstellt)</string>
   <string name="workspace_ssh_editor_host_key_changed">Hostschlüssel geändert</string>
   <string name="workspace_ssh_editor_host_key_confirm">Hostschlüssel bestätigen</string>
   <string name="workspace_ssh_editor_host_key_changed_message">Der von %1$s angezeigte Hostschlüssel stimmt nicht mit dem überein, dem du zuvor vertraut hast. Der Server wurde möglicherweise neu installiert oder jemand gibt sich als er aus (Man-in-the-Middle-Angriff). Fahre erst fort, nachdem du ihn verifiziert hast.</string>

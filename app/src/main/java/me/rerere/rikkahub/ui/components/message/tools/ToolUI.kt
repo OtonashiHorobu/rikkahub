@@ -32,6 +32,7 @@ import me.rerere.rikkahub.ui.components.richtext.HighlightCodeBlock
 import me.rerere.rikkahub.ui.components.richtext.ZoomableAsyncImage
 import me.rerere.rikkahub.utils.JsonInstant
 import me.rerere.rikkahub.utils.JsonInstantPretty
+import me.rerere.rikkahub.utils.PartialString
 import me.rerere.rikkahub.utils.jsonPrimitiveOrNull
 import me.rerere.ui.components.FormItem
 
@@ -48,7 +49,24 @@ data class ToolUIContext(
     val loading: Boolean,
     /** 发起该工具调用的助手, 拿不到时为 null */
     val assistant: Assistant? = null,
-)
+    /** 参数原文（可能还在流式增长） */
+    val rawInput: String = "",
+    /**
+     * 参数里已经到达的字段，含未收全的前缀。
+     *
+     * 生成中时 [arguments] 往往是空的（半截 JSON 解析不出来），
+     * 渲染器想"边生成边显示"就读这个。
+     */
+    val partial: Map<String, PartialString> = emptyMap(),
+    /** 参数是否已经收全（ToolCallEnd 到达，或工具已开始执行） */
+    val inputComplete: Boolean = true,
+) {
+    /** 从流式参数里取一个字段，没收全也返回已到达的前缀 */
+    fun streamingArg(name: String): String? = partial[name]?.value?.takeIf { it.isNotEmpty() }
+
+    /** 字段是否已经收全 */
+    fun argComplete(name: String): Boolean = partial[name]?.complete == true
+}
 
 /**
  * 单个工具的 UI 渲染器
@@ -107,6 +125,10 @@ object ToolUIRegistry {
         ConversationSearchToolUI,
         EditFileToolUI,
         ReadFileToolUI,
+        CdToolUI,
+        ListDirToolUI,
+        GlobToolUI,
+        GrepToolUI,
         WriteFileToolUI,
         ShellToolUI,
     ).plus(MemoryFileToolUI.all).associateBy { it.toolName }
@@ -152,10 +174,10 @@ fun DefaultToolPreview(
                 Text(stringResource(R.string.chat_message_tool_call_label, context.tool.toolName))
             }
         ) {
-            HighlightCodeBlock(
-                code = JsonInstantPretty.encodeToString(context.arguments),
-                language = "json",
-                style = TextStyle(fontSize = 10.sp, lineHeight = 12.sp)
+            ArgumentTable(
+                arguments = context.arguments,
+                partial = context.partial,
+                rawInput = context.rawInput,
             )
         }
         if (context.tool.output.isNotEmpty()) {

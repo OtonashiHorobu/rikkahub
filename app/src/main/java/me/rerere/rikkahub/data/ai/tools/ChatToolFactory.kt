@@ -2,6 +2,7 @@ package me.rerere.rikkahub.data.ai.tools
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.jsonObject
 import me.rerere.ai.core.Tool
 import me.rerere.ai.provider.BuiltInTools
@@ -10,7 +11,9 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FileFolders
+import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
@@ -44,14 +47,25 @@ class ChatToolFactory(
     private val mcpManager: McpManager,
     private val skillManager: SkillManager,
     private val workspaceRepository: WorkspaceRepository,
+    private val appEventBus: AppEventBus,
+    /** 延迟解析，ChatService 依赖本类，直接构造会成环 */
+    private val lazyCwdWriter: Lazy<ConversationCwdWriter>? = null,
 ) {
     suspend fun createTools(
         settings: Settings,
         assistant: Assistant,
         model: Model,
         workspaceCwd: String? = null,
+        conversationId: Uuid? = null,
+        workspaceCwdLocked: Boolean = false,
+        permissionLevel: AgentPermissionLevel = assistant.permissionLevel,
     ): List<Tool> {
-        val workspaceTools = createWorkspaceToolsIfReady(assistant.workspaceId?.toString(), workspaceCwd)
+        val workspaceTools = createWorkspaceToolsIfReady(
+            workspaceId = assistant.workspaceId?.toString(),
+            conversationId = conversationId,
+            cwd = workspaceCwd,
+            cwdLocked = workspaceCwdLocked,
+        )
         val tools = buildList {
             if (assistant.enableMemory) {
                 addAll(buildMemoryTools(memoryRepository, assistant.memoryId))
@@ -64,6 +78,17 @@ class ChatToolFactory(
                 addAll(createConversationTools(conversationRepository, assistant.id))
             }
             addAll(workspaceTools)
+            // F2 只读层：让模型知道应用里有什么，并能把界面推到对应页面
+            addAll(
+                createAppReadOnlyTools(
+                    settings = settings,
+                    assistant = assistant,
+                    conversationId = conversationId,
+                    workspace = { workspaceRepository.listFlow().first() },
+                    skills = { skillManager.listSkills() },
+                    appEventBus = appEventBus,
+                )
+            )
             if (assistant.enabledSkills.isNotEmpty()) {
                 addAll(
                     createSkillTools(
@@ -97,7 +122,9 @@ class ChatToolFactory(
         // 文件放在本机, 只有本地 Rootfs 挂载了 /tool_outputs, 远程工作区同样读不到
         val canReadToolOutputs = workspaceTools.isNotEmpty() &&
             assistant.workspaceId?.let { workspaceRepository.getById(it.toString()) }?.capabilities()?.rootfs == true
-        return if (canReadToolOutputs) tools.map(::withOutputTruncation) else tools
+        val truncatable = if (canReadToolOutputs) tools.map(::withOutputTruncation) else tools
+        // 权限等级只裁剪"注册给模型的工具"，不改变审批；未被登记的工具按 READ_ONLY 处理
+        return truncatable.filter { permissionLevel.grants(AgentToolLevels.requiredLevel(it.name)) }
     }
 
     private fun withOutputTruncation(tool: Tool): Tool {
@@ -131,16 +158,36 @@ class ChatToolFactory(
         ) + output.filter { it !is UIMessagePart.Text }
     }
 
-    private suspend fun createWorkspaceToolsIfReady(workspaceId: String?, cwd: String?): List<Tool> {
+    private suspend fun createWorkspaceToolsIfReady(
+        workspaceId: String?,
+        conversationId: Uuid?,
+        cwd: String?,
+        cwdLocked: Boolean,
+    ): List<Tool> {
         if (workspaceId.isNullOrBlank()) return emptyList()
         val workspace = workspaceRepository.getById(workspaceId) ?: return emptyList()
-        if (workspace.shellStatus != WorkspaceShellStatus.READY.name) {
+        val layout = workspaceRepository.layout(workspaceId) ?: return emptyList()
+        // shell 没就绪也给文件工具和 cd：本地工作区可能只装了文件区，全灭会让模型彻底没有手脚
+        val shellReady = workspace.shellStatus == WorkspaceShellStatus.READY.name
+        if (!shellReady) {
             Log.d(
                 TAG,
-                "createWorkspaceToolsIfReady: skip workspace tools, workspace=$workspaceId, status=${workspace.shellStatus}"
+                "createWorkspaceToolsIfReady: shell not ready, workspace=$workspaceId, status=${workspace.shellStatus}"
             )
-            return emptyList()
         }
-        return createWorkspaceTools(workspaceId, workspaceRepository, cwd)
+        return createWorkspaceTools(
+            context = WorkspaceToolContext(
+                workspaceId = workspaceId,
+                conversationId = conversationId,
+                cwd = cwd,
+                cwdLocked = cwdLocked,
+                cwdWriter = lazyCwdWriter?.value,
+            ),
+            workspaceRepository = workspaceRepository,
+            layout = layout,
+            capabilities = workspace.capabilities(),
+            toolApprovalOverrides = workspace.toolApprovalOverrides(),
+            includeShell = shellReady,
+        )
     }
 }

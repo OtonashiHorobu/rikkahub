@@ -19,6 +19,8 @@
   <uses-permission
     android:name="android.permission.PACKAGE_USAGE_STATS"
     tools:ignore="ProtectedPermissions" />
+  <!-- 工作区里点开 .apk 时用 PackageInstaller 安装；仍需用户在系统设置里允许"安装未知应用" -->
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
   <uses-permission android:name="android.permission.READ_CALENDAR" />
   <uses-permission android:name="android.permission.WRITE_CALENDAR" />
 
@@ -139,6 +141,11 @@
         android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
         android:value="local web server for LLM chat UI" />
     </service>
+
+    <!-- PackageInstaller 会话结果回调；不可导出，只接收系统发送的 PendingIntent -->
+    <receiver
+      android:name=".ui.pages.extensions.workspace.ApkInstallReceiver"
+      android:exported="false" />
 
     <provider
       android:name="androidx.core.content.FileProvider"

@@ -251,25 +251,6 @@ fun WorkspaceSshEditorPage(id: String?) {
             }
 
             item {
-                CardGroup(title = { Text(stringResource(R.string.workspace_ssh_editor_working_dir)) }) {
-                    formItem(
-                        headlineContent = { Text(stringResource(R.string.workspace_ssh_editor_remote_dir)) },
-                        supportingContent = { Text(stringResource(R.string.workspace_ssh_editor_remote_dir_desc)) },
-                    ) {
-                        OutlinedTextField(
-                            enabled = editable,
-                            value = state.remoteDir,
-                            onValueChange = { value -> vm.update { it.copy(remoteDir = value.trim()) } },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("/home/user/project") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        )
-                    }
-                }
-            }
-
-            item {
                 CardGroup(title = { Text(stringResource(R.string.workspace_ssh_editor_security)) }) {
                     item(
                         leadingContent = { CardGroupIcon(HugeIcons.FingerPrint) },
@@ -403,14 +384,7 @@ private fun ProbeSection(
                     leadingContent = { CardGroupIcon(HugeIcons.Folder01) },
                     headlineContent = { Text(stringResource(R.string.workspace_ssh_editor_working_dir)) },
                     supportingContent = {
-                        Text(
-                            when {
-                                state.remoteDir.isBlank() || state.remoteDir == result.homeDir ->
-                                    stringResource(R.string.workspace_ssh_editor_home_dir, result.homeDir)
-                                result.remoteDirExists -> state.remoteDir
-                                else -> stringResource(R.string.workspace_ssh_editor_dir_missing, state.remoteDir)
-                            }
-                        )
+                        Text(stringResource(R.string.workspace_ssh_editor_home_dir, result.homeDir))
                     },
                 )
             }

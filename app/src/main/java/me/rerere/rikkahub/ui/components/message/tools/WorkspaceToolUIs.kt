@@ -214,11 +214,25 @@ object WriteFileToolUI : ToolUIRenderer {
     @Composable
     override fun Summary(context: ToolUIContext) {
         val text = remember(context) { textOf(context) } ?: return
-        FileContentSummary(
-            text = text,
-            path = context.arguments.getStringContent("path"),
-            loading = context.loading,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            FileContentSummary(
+                text = text,
+                path = context.arguments.getStringContent("path"),
+                loading = context.loading,
+            )
+            // 内容还在流式到达时给出体量，长文件生成过程中能看出进度
+            if (!context.inputComplete) {
+                Text(
+                    text = stringResource(
+                        R.string.tool_ui_write_file_streaming,
+                        text.length,
+                        text.count { it == '\n' } + 1,
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 
     @Composable

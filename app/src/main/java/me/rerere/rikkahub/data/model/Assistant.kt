@@ -52,6 +52,9 @@ data class Assistant(
     val enableTimeReminder: Boolean = false, // 时间间隔提醒注入
     val timeReminderIntervalMinutes: Int = 60, // 时间提醒间隔（分钟，至少 1 分钟）
     val allowConversationSystemPrompt: Boolean = false, // 允许对话单独重写 system prompt
+    // 助手默认的 Agent 权限等级; 会话可以在 ConversationConfig 里覆盖
+    // 默认 WORKSPACE_WRITE: 与引入等级之前的实际能力一致(工作区写文件、shell 都可用), 升级不会静默丢工具
+    val permissionLevel: AgentPermissionLevel = AgentPermissionLevel.WORKSPACE_WRITE,
 )
 
 @Serializable

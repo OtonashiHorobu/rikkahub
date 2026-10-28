@@ -1678,7 +1678,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="workspace_detail_ssh_connection">SSH接続</string>
   <string name="workspace_detail_ssh_address">アドレス</string>
   <string name="workspace_detail_ssh_config_missing">設定が見つかりません</string>
-  <string name="workspace_detail_ssh_remote_dir">リモートディレクトリ</string>
   <string name="workspace_detail_ssh_host_key">ホスト鍵</string>
   <string name="workspace_detail_ssh_host_key_unconfirmed">まだ確認されていません。接続する前に、編集ページで接続をテストしてください</string>
   <string name="workspace_detail_ssh_edit">接続を編集</string>
@@ -1706,8 +1705,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="workspace_ssh_editor_passphrase">パスフレーズ</string>
   <string name="workspace_ssh_editor_passphrase_placeholder">秘密鍵が暗号化されていない場合は空欄のままにしてください</string>
   <string name="workspace_ssh_editor_working_dir">作業ディレクトリ</string>
-  <string name="workspace_ssh_editor_remote_dir">リモートディレクトリ</string>
-  <string name="workspace_ssh_editor_remote_dir_desc">AI はデフォルトでここでファイルの読み書きを行い、コマンドを実行します。接続テスト後、リモートユーザーのホームディレクトリを使用するには空のままにしてください</string>
   <string name="workspace_ssh_editor_security">セキュリティ</string>
   <string name="workspace_ssh_editor_host_key">ホスト鍵</string>
   <string name="workspace_ssh_editor_host_key_unconfirmed">まだ確認されていません。接続のテスト時または保存時に、サーバーのフィンガープリントを検証するよう求められます</string>
@@ -1720,7 +1717,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="workspace_ssh_editor_connected">接続済み</string>
   <string name="workspace_ssh_editor_shell">シェル</string>
   <string name="workspace_ssh_editor_home_dir">%1$s（ホームディレクトリ）</string>
-  <string name="workspace_ssh_editor_dir_missing">%1$s（存在しません。初回使用時に作成されます）</string>
   <string name="workspace_ssh_editor_host_key_changed">ホスト鍵が変更されました</string>
   <string name="workspace_ssh_editor_host_key_confirm">ホストキーを確認</string>
   <string name="workspace_ssh_editor_host_key_changed_message">%1$s によって提示されたホスト鍵は、以前に信頼したものと一致しません。サーバーが再インストールされたか、誰かがサーバーになりすましている可能性があります（中間者攻撃）。確認が取れるまで続行しないでください。</string>
@@ -1729,7 +1725,6 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="workspace_ssh_editor_trust_continue">信頼して続行</string>
   <string name="workspace_ssh_editor_not_found">ワークスペースが存在しないか、SSHワークスペースではありません</string>
   <string name="workspace_ssh_editor_missing_fields">ホスト、ポート、ユーザー名を入力してください</string>
-  <string name="workspace_ssh_editor_missing_remote_dir">リモートの作業ディレクトリを入力してください</string>
   <string name="workspace_ssh_editor_save_failed">保存に失敗しました</string>
   <string name="skills_page_invalid_dirs_title">認識されないフォルダ</string>
   <string name="skills_page_invalid_reason_missing_skill_md">SKILL.md がありません</string>

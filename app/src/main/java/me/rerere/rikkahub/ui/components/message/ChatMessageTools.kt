@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +56,9 @@ import me.rerere.hugeicons.stroke.Tools
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.ai.tools.local.ASK_USER_TOOL_NAME
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.utils.parsePartialJson
+import me.rerere.rikkahub.utils.toJsonObject
+import me.rerere.rikkahub.ui.components.message.tools.ArgumentStreamRow
 import me.rerere.rikkahub.ui.components.message.tools.DefaultToolPreview
 import me.rerere.rikkahub.ui.components.message.tools.ToolUIContext
 import me.rerere.rikkahub.ui.components.message.tools.ToolUIRegistry
@@ -125,30 +129,52 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
     }
     // 输出不是 JSON (例如超长被截断后只剩文本预览) 时, 定制渲染器读不到任何字段, 详情改用默认渲染展示原文
     val outputUnparsable = tool.isExecuted && outputJson == null
-    val context = remember(tool, loading, assistant) {
+    // 参数可能还在流式到达：完整解析成功就用原 JSON，否则用容错解析出的字段拼一个，
+    // 这样现有渲染器在生成过程中也能读到 path / command 之类的值
+    val partialInput = remember(tool.input) { parsePartialJson(tool.input) }
+    val inputComplete = tool.isExecuted || runCatching {
+        JsonInstant.parseToJsonElement(tool.input.ifBlank { "{}" })
+    }.isSuccess
+    val context = remember(tool, loading, assistant, partialInput, inputComplete) {
         ToolUIContext(
             tool = tool,
-            arguments = tool.inputAsJson(),
+            arguments = if (inputComplete) tool.inputAsJson() else partialInput.toJsonObject(),
             content = if (tool.isExecuted) outputJson ?: JsonObject(emptyMap()) else null,
             loading = loading,
             assistant = assistant,
+            rawInput = tool.input,
+            partial = partialInput,
+            inputComplete = inputComplete,
         )
     }
 
     var showResult by remember { mutableStateOf(false) }
     var showDenyDialog by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(true) }
+    // 折叠态：生成中自动展开；这一轮结束后，有摘要内容的保持展开，纯一行标题的自动收起；
+    // 用户自己点过折叠按钮之后就不再跟着自动切换（同一个 toolCallId 记住）
+    var expanded by remember(tool.toolCallId) { mutableStateOf(true) }
+    var userToggledExpanded by remember(tool.toolCallId) { mutableStateOf(false) }
     val isPending = tool.isPending
     val isDenied = tool.approvalState is ToolApprovalState.Denied
     val images = tool.output.filterIsInstance<UIMessagePart.Image>()
     val duration = rememberToolDuration(tool, loading)
 
+    // 参数还在到达时总是显示一行实时参数：这是"点开之前就能看出在做什么"的唯一途径
+    val streamingArgs = !inputComplete && tool.input.isNotBlank()
     // 摘要由注册的渲染器决定; 图片输出与拒绝原因为所有工具通用
-    val hasExtraContent = renderer.hasSummary(context) || isDenied || images.isNotEmpty()
+    val hasExtraContent = streamingArgs || renderer.hasSummary(context) || isDenied || images.isNotEmpty()
+
+    LaunchedEffect(loading, hasExtraContent, userToggledExpanded) {
+        if (userToggledExpanded) return@LaunchedEffect
+        expanded = loading || hasExtraContent
+    }
 
     ControlledChainOfThoughtStep(
         expanded = expanded,
-        onExpandedChange = { expanded = it },
+        onExpandedChange = {
+            userToggledExpanded = true
+            expanded = it
+        },
         icon = {
             if (loading) {
                 DotLoading(
@@ -216,6 +242,9 @@ fun ChainOfThoughtScope.ChatMessageToolStep(
         content = if (hasExtraContent) {
             {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (streamingArgs) {
+                        ArgumentStreamRow(context = context)
+                    }
                     renderer.Summary(context)
                     if (images.isNotEmpty()) {
                         LazyRow(

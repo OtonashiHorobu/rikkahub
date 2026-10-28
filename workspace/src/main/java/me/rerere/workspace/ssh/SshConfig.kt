@@ -35,8 +35,6 @@ data class SshConnectionConfig(
     /** OpenSSH / PEM 格式的私钥文本 */
     val privateKey: String? = null,
     val passphrase: String? = null,
-    /** 远程工作目录, 必须是绝对路径 */
-    val remoteDir: String,
     /** 为 null 时首次连接会抛出 [SshUnknownHostKeyException], 由用户确认指纹后再连 */
     val hostKey: SshHostKey? = null,
 ) {
@@ -45,15 +43,15 @@ data class SshConnectionConfig(
 
     // 不让凭据出现在日志和异常信息里
     override fun toString(): String =
-        "SshConnectionConfig(address=$address, authType=$authType, remoteDir=$remoteDir, hostKey=${hostKey?.fingerprint})"
+        "SshConnectionConfig(address=$address, authType=$authType, hostKey=${hostKey?.fingerprint})"
 }
 
 /** 测试连接的结果 */
 data class SshProbeResult(
     val hostKey: SshHostKey,
+    /** 登录后的主目录, 会话没有 cwd 时以它为准 */
     val homeDir: String,
     val shell: String,
-    val remoteDirExists: Boolean,
 )
 
 /** 服务器的主机密钥尚未被信任, 需要用户确认 [hostKey] 的指纹 */

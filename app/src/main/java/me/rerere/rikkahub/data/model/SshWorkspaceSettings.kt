@@ -16,8 +16,11 @@ data class SshWorkspaceSettings(
     val port: Int = 22,
     val username: String,
     val authType: SshAuthType = SshAuthType.PASSWORD,
-    /** 远程工作目录, 绝对路径 */
-    val remoteDir: String,
+    /**
+     * 登录后的主目录, 连上过一次才知道; 会话没有 cwd 时以它为准。
+     * 只是缓存: 读不到就重新探测, 不影响用户配置。
+     */
+    val homeDir: String? = null,
     /** 用户确认过的主机公钥 */
     val hostKey: SshHostKey? = null,
     val encryptedPassword: String? = null,
@@ -35,6 +38,5 @@ data class SshWorkspaceDraft(
     val password: String = "",
     val privateKey: String = "",
     val passphrase: String = "",
-    val remoteDir: String,
     val hostKey: SshHostKey? = null,
 )

@@ -69,22 +69,56 @@ data class WorkspaceLayout(
     val workspaceDir: String,
     /** AI 写入时免强制审批的目录 */
     val writableRoots: List<String>,
+    /**
+     * 文件区按绝对路径寻址。
+     *
+     * 本地工作区的文件区只有一个固定目录 ([workspaceDir]), 界面用相对路径就够了;
+     * 远程 (SSH) 没有固定根: 默认目录是登录后的 home, 会话 cwd 可以指到机器上任意位置,
+     * 所以文件区直接收绝对路径, 相对路径才按 [workspaceDir] 拼。
+     */
+    val absolutePaths: Boolean = false,
 ) {
     /** 存储区内的相对路径转成环境内的绝对路径 */
     fun absolutePath(area: WorkspaceStorageArea, path: String): String {
-        val relative = path.trim('/')
+        val raw = path.trim()
+        val relative = raw.trim('/')
         return when (area) {
-            WorkspaceStorageArea.FILES -> if (relative.isEmpty()) workspaceDir else "$workspaceDir/$relative"
-            WorkspaceStorageArea.LINUX -> "/$relative"
+            WorkspaceStorageArea.FILES -> when {
+                absolutePaths && raw.startsWith("/") -> normalizeAbsolutePath(raw)
+                relative.isEmpty() -> workspaceDir
+                else -> joinPath(workspaceDir, relative)
+            }
+
+            WorkspaceStorageArea.LINUX -> if (relative.isEmpty()) "/" else "/$relative"
         }
     }
 
     /** 文件区内的绝对路径转成相对文件区的路径, 不在文件区内时原样返回 */
     fun relativeToWorkspace(path: String): String =
-        path.removePrefix("$workspaceDir/").removePrefix(workspaceDir)
+        if (absolutePaths) {
+            path
+        } else {
+            path.removePrefix("$workspaceDir/").removePrefix(workspaceDir)
+        }
 
     fun isWritable(path: String): Boolean {
         val normalized = path.trimEnd('/').ifBlank { "/" }
         return writableRoots.any { root -> normalized == root || normalized.startsWith("$root/") }
     }
+}
+
+private fun joinPath(base: String, relative: String): String =
+    if (base == "/") "/$relative" else "${base.trimEnd('/')}/$relative"
+
+/** 按字面规范化绝对路径: 去掉 . 和多余的 /, 解析 .., 不跟随软链 */
+internal fun normalizeAbsolutePath(path: String): String {
+    val segments = ArrayDeque<String>()
+    path.replace('\\', '/').split('/').forEach { segment ->
+        when (segment) {
+            "", "." -> Unit
+            ".." -> segments.removeLastOrNull()
+            else -> segments.addLast(segment)
+        }
+    }
+    return "/" + segments.joinToString("/")
 }

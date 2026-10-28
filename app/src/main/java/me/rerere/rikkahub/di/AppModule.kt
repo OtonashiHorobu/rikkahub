@@ -109,6 +109,9 @@ val appModule = module {
             mcpManager = get(),
             skillManager = get(),
             workspaceRepository = get(),
+            appEventBus = get(),
+            // ChatService 反依赖本类，用 Lazy 断开构造期的环
+            lazyCwdWriter = lazy { get<ChatService>() },
         )
     }
 

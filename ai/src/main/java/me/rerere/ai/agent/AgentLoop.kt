@@ -9,6 +9,7 @@ import kotlinx.serialization.json.put
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.sum
 import me.rerere.ai.provider.TextGenerationParams
+import me.rerere.ai.ui.StreamChunk
 import me.rerere.ai.ui.StreamChunkHandler
 import me.rerere.ai.ui.ToolApprovalState
 import me.rerere.ai.ui.UIMessage
@@ -22,6 +23,9 @@ import kotlin.time.TimeSource
 
 // 输出为空的工具会被当成没执行过，之后每一步都会再执行一次，所以换成占位文本
 private const val EMPTY_TOOL_OUTPUT = "(no output)"
+
+/** 工具参数预览的最小间隔，见 [AgentLoop.stream] */
+private const val TOOL_PREVIEW_INTERVAL_MS = 60L
 
 private class StreamChunkHandlingException(override val cause: Throwable) : RuntimeException(cause)
 
@@ -113,11 +117,20 @@ internal class AgentLoop(
                 val handler = StreamChunkHandler(params.model)
                 var attempt = stepStart
                 var firstChunk: TimeMark? = null
+                // 工具参数是边生成边长的大字符串，每个 delta 都推一次 UI 等于白刷几十帧；
+                // 这里按 60ms 合并工具参数的预览，文本/推理的增长一个 delta 都不落，
+                // 本步结束时 generateStep() 里的 update() 会把最终参数完整补发一次。
+                var lastToolPreviewAt = 0L
                 request.provider.streamText(request.providerSetting, messages, params).collect { chunk ->
                     try {
                         val mark = firstChunk ?: TimeSource.Monotonic.markNow().also { firstChunk = it }
                         attempt = handler.handle(listOf(attempt), chunk).single()
-                        preview(attempt.withStepStats(base, mark.elapsedNow()), newPartsFrom = base.parts.size)
+                        val toolDelta = chunk is StreamChunk.ToolCallDelta
+                        val elapsedMs = mark.elapsedNow().inWholeMilliseconds
+                        if (!toolDelta || elapsedMs - lastToolPreviewAt >= TOOL_PREVIEW_INTERVAL_MS) {
+                            preview(attempt.withStepStats(base, mark.elapsedNow()), newPartsFrom = base.parts.size)
+                            if (toolDelta) lastToolPreviewAt = elapsedMs
+                        }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Throwable) {

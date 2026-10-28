@@ -286,6 +286,7 @@ class RouteActivity : ComponentActivity() {
                     is AppEvent.OpenUsageAccessSettings -> this@RouteActivity.openUsageAccessSettings()
                     is AppEvent.ChatGenerationUpdate -> Unit // 由 ChatNotificationManager 消费
                     is AppEvent.ChatGenerationEnded -> Unit // 由 ChatNotificationManager 消费
+                    is AppEvent.Navigate -> navStack?.takeIf { it.lastOrNull() != event.screen }?.add(event.screen)
                 }
             }
         }
@@ -566,7 +567,7 @@ class RouteActivity : ComponentActivity() {
                             }
 
                             entry<Screen.WorkspaceDetail> { key ->
-                                WorkspaceDetailPage(key.id)
+                                WorkspaceDetailPage(key.id, key.tab, key.cwd)
                             }
 
                             entry<Screen.WorkspaceTerminal> { key ->
@@ -804,8 +805,13 @@ sealed interface Screen : NavKey {
     @Serializable
     data object Workspaces : Screen
 
+    /** [tab] 用 [me.rerere.rikkahub.ui.pages.extensions.workspace.WorkspaceDetailTab.route]; [cwd] 是会话当前目录 */
     @Serializable
-    data class WorkspaceDetail(val id: String) : Screen
+    data class WorkspaceDetail(
+        val id: String,
+        val tab: String = "basic",
+        val cwd: String? = null,
+    ) : Screen
 
     @Serializable
     data class WorkspaceTerminal(val id: String) : Screen

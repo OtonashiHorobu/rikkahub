@@ -1678,7 +1678,6 @@
   <string name="workspace_detail_ssh_connection">SSH-подключение</string>
   <string name="workspace_detail_ssh_address">Адрес</string>
   <string name="workspace_detail_ssh_config_missing">Отсутствует конфигурация</string>
-  <string name="workspace_detail_ssh_remote_dir">Удалённый каталог</string>
   <string name="workspace_detail_ssh_host_key">Ключ хоста</string>
   <string name="workspace_detail_ssh_host_key_unconfirmed">Ещё не подтверждено. Проверьте подключение на странице редактирования перед подключением</string>
   <string name="workspace_detail_ssh_edit">Изменить подключение</string>
@@ -1706,8 +1705,6 @@
   <string name="workspace_ssh_editor_passphrase">Парольная фраза</string>
   <string name="workspace_ssh_editor_passphrase_placeholder">Оставьте пустым, если закрытый ключ не зашифрован</string>
   <string name="workspace_ssh_editor_working_dir">Рабочий каталог</string>
-  <string name="workspace_ssh_editor_remote_dir">Удалённый каталог</string>
-  <string name="workspace_ssh_editor_remote_dir_desc">По умолчанию ИИ читает и записывает файлы и выполняет команды здесь. Оставьте пустым, чтобы использовать домашний каталог удалённого пользователя после проверки подключения</string>
   <string name="workspace_ssh_editor_security">Безопасность</string>
   <string name="workspace_ssh_editor_host_key">Ключ хоста</string>
   <string name="workspace_ssh_editor_host_key_unconfirmed">Ещё не подтверждено. При проверке подключения или сохранении вам будет предложено проверить отпечаток сервера.</string>
@@ -1720,7 +1717,6 @@
   <string name="workspace_ssh_editor_connected">Подключено</string>
   <string name="workspace_ssh_editor_shell">Shell</string>
   <string name="workspace_ssh_editor_home_dir">%1$s (домашний каталог)</string>
-  <string name="workspace_ssh_editor_dir_missing">%1$s (не существует, будет создан при первом использовании)</string>
   <string name="workspace_ssh_editor_host_key_changed">Ключ хоста изменён</string>
   <string name="workspace_ssh_editor_host_key_confirm">Подтвердить ключ хоста</string>
   <string name="workspace_ssh_editor_host_key_changed_message">Ключ хоста, предоставленный %1$s, не совпадает с тем, которому вы доверяли ранее. Возможно, сервер был переустановлен или кто-то выдает себя за него (атака «человек посередине»). Не продолжайте, пока не проверите его.</string>
@@ -1729,7 +1725,6 @@
   <string name="workspace_ssh_editor_trust_continue">Доверять и продолжить</string>
   <string name="workspace_ssh_editor_not_found">Рабочее пространство не существует или не является SSH-рабочим пространством</string>
   <string name="workspace_ssh_editor_missing_fields">Введите хост, порт и имя пользователя</string>
-  <string name="workspace_ssh_editor_missing_remote_dir">Введите удалённый рабочий каталог</string>
   <string name="workspace_ssh_editor_save_failed">Не удалось сохранить</string>
   <string name="skills_page_invalid_dirs_title">Нераспознанные папки</string>
   <string name="skills_page_invalid_reason_missing_skill_md">Отсутствует SKILL.md</string>

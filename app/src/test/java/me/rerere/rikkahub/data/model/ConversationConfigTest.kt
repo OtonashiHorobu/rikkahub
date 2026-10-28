@@ -69,6 +69,8 @@ class ConversationConfigTest {
                 mcpServers = setOf(mcpServer),
                 workspaceId = workspace,
                 enabledSkills = setOf("skill"),
+                // 会话落库时把助手当时的权限等级一起拍进快照，之后的助手改动不影响这个会话
+                permissionLevel = AgentPermissionLevel.WORKSPACE_WRITE,
             ),
             bound.config,
         )

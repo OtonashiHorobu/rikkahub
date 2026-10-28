@@ -1678,7 +1678,6 @@ mDNS 주소: .local 호스트네임을 사용하며, IP를 몰라도 같은 네�
   <string name="workspace_detail_ssh_connection">SSH 연결</string>
   <string name="workspace_detail_ssh_address">주소</string>
   <string name="workspace_detail_ssh_config_missing">구성이 누락되었습니다</string>
-  <string name="workspace_detail_ssh_remote_dir">원격 디렉터리</string>
   <string name="workspace_detail_ssh_host_key">호스트 키</string>
   <string name="workspace_detail_ssh_host_key_unconfirmed">아직 확인되지 않았습니다. 연결하기 전에 편집 페이지에서 연결을 테스트하세요.</string>
   <string name="workspace_detail_ssh_edit">연결 편집</string>
@@ -1706,8 +1705,6 @@ mDNS 주소: .local 호스트네임을 사용하며, IP를 몰라도 같은 네�
   <string name="workspace_ssh_editor_passphrase">패스프레이즈</string>
   <string name="workspace_ssh_editor_passphrase_placeholder">개인 키가 암호화되지 않은 경우 비워 두세요.</string>
   <string name="workspace_ssh_editor_working_dir">작업 디렉터리</string>
-  <string name="workspace_ssh_editor_remote_dir">원격 디렉터리</string>
-  <string name="workspace_ssh_editor_remote_dir_desc">AI는 기본적으로 여기에서 파일을 읽고 쓰고 명령을 실행합니다. 비워 두면 연결을 테스트한 후 원격 사용자의 홈 디렉터리를 사용합니다.</string>
   <string name="workspace_ssh_editor_security">보안</string>
   <string name="workspace_ssh_editor_host_key">호스트 키</string>
   <string name="workspace_ssh_editor_host_key_unconfirmed">아직 확인되지 않았습니다. 연결을 테스트하거나 저장할 때 서버 지문을 확인하라는 요청을 받게 됩니다.</string>
@@ -1720,7 +1717,6 @@ mDNS 주소: .local 호스트네임을 사용하며, IP를 몰라도 같은 네�
   <string name="workspace_ssh_editor_connected">연결됨</string>
   <string name="workspace_ssh_editor_shell">Shell</string>
   <string name="workspace_ssh_editor_home_dir">%1$s (홈 디렉터리)</string>
-  <string name="workspace_ssh_editor_dir_missing">%1$s (존재하지 않으며, 처음 사용할 때 생성됩니다)</string>
   <string name="workspace_ssh_editor_host_key_changed">호스트 키가 변경되었습니다</string>
   <string name="workspace_ssh_editor_host_key_confirm">호스트 키 확인</string>
   <string name="workspace_ssh_editor_host_key_changed_message">%1$s에서 제시한 호스트 키가 이전에 신뢰한 키와 일치하지 않습니다. 서버가 재설치되었거나 누군가가 서버를 사칭하고 있을 수 있습니다(중간자 공격). 확인하기 전까지는 계속하지 마세요.</string>
@@ -1729,7 +1725,6 @@ mDNS 주소: .local 호스트네임을 사용하며, IP를 몰라도 같은 네�
   <string name="workspace_ssh_editor_trust_continue">신뢰하고 계속</string>
   <string name="workspace_ssh_editor_not_found">워크스페이스가 존재하지 않거나 SSH 워크스페이스가 아닙니다.</string>
   <string name="workspace_ssh_editor_missing_fields">호스트, 포트, 사용자 이름을 입력하세요</string>
-  <string name="workspace_ssh_editor_missing_remote_dir">원격 작업 디렉터리를 입력하세요</string>
   <string name="workspace_ssh_editor_save_failed">저장하지 못했습니다</string>
   <string name="skills_page_invalid_dirs_title">인식되지 않는 폴더</string>
   <string name="skills_page_invalid_reason_missing_skill_md">SKILL.md가 없습니다</string>

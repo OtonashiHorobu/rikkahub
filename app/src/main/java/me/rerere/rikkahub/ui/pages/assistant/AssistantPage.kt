@@ -64,6 +64,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.DEFAULT_ASSISTANTS_IDS
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.MemoryFile
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -128,7 +129,8 @@ fun AssistantPage(vm: AssistantVM = koinViewModel()) {
                 actions = {
                     IconButton(
                         onClick = {
-                            createState.open(Assistant())
+                            // 新建的助手从只读起步；老助手反序列化时缺字段会落到 CONFIG，保持升级前的行为
+                            createState.open(Assistant(permissionLevel = AgentPermissionLevel.READ_ONLY))
                         }) {
                         Icon(HugeIcons.Add01, stringResource(R.string.assistant_page_add))
                     }

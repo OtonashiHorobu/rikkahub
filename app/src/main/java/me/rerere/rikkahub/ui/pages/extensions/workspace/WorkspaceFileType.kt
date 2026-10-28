@@ -7,8 +7,9 @@ import me.rerere.workspace.WorkspaceFileEntry
  * - TEXT: 应用内文本编辑/预览
  * - IMAGE: 应用内可缩放图片预览
  * - OTHER: 交给系统应用 (视频/音频/文档等) 打开
+ * - APK: 弹安装面板, 交给 PackageInstaller
  */
-enum class WorkspaceFileType { TEXT, IMAGE, OTHER }
+enum class WorkspaceFileType { TEXT, IMAGE, APK, OTHER }
 
 private val IMAGE_EXTENSIONS = setOf(
     "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic", "heif", "avif", "ico",
@@ -28,6 +29,7 @@ fun WorkspaceFileEntry.detectFileType(): WorkspaceFileType {
     return when {
         ext.isEmpty() -> WorkspaceFileType.OTHER
         ext in IMAGE_EXTENSIONS -> WorkspaceFileType.IMAGE
+        ext == "apk" -> WorkspaceFileType.APK
         ext in TEXT_EXTENSIONS -> WorkspaceFileType.TEXT
         else -> WorkspaceFileType.OTHER
     }
