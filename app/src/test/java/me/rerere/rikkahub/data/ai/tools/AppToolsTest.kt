@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.data.ai.tools
 
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -17,7 +18,6 @@ import me.rerere.rikkahub.data.model.AgentPermissionLevel
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.skills.SkillMetadata
 import me.rerere.rikkahub.utils.JsonInstant
-import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull

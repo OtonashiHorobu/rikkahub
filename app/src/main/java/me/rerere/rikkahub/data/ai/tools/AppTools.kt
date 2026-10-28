@@ -18,10 +18,10 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findModelById
+import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.event.AppEvent
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.model.Assistant
-import me.rerere.rikkahub.data.db.entity.WorkspaceEntity
 import me.rerere.rikkahub.data.skills.SkillMetadata
 import me.rerere.rikkahub.utils.JsonInstantPretty
 import kotlin.uuid.Uuid
@@ -123,7 +123,7 @@ private fun appListAssistantsTool(settings: Settings) = Tool(
         )
     },
     execute = { args ->
-        val query = args.stringArg("query").trim()
+        val query = args.strArg("query").trim()
         val payload = buildJsonArray {
             settings.assistants
                 .filter { query.isEmpty() || it.name.contains(query, ignoreCase = true) }
@@ -161,7 +161,7 @@ private fun appListProvidersTool(settings: Settings) = Tool(
         )
     },
     execute = { args ->
-        val includeModels = args.booleanArg("include_models") ?: false
+        val includeModels = args.boolArg("include_models") ?: false
         val payload = buildJsonArray {
             settings.providers.forEach { provider -> add(providerSummary(provider, includeModels)) }
         }
@@ -196,9 +196,9 @@ private fun appListModelsTool(settings: Settings) = Tool(
         )
     },
     execute = { args ->
-        val providerId = args.stringArg("provider_id").trim()
-        val type = args.stringArg("type").trim().lowercase().ifEmpty { null }
-        val query = args.stringArg("query").trim()
+        val providerId = args.strArg("provider_id").trim()
+        val type = args.strArg("type").trim().lowercase().ifEmpty { null }
+        val query = args.strArg("query").trim()
         val payload = buildJsonArray {
             settings.providers
                 .filter { providerId.isEmpty() || it.id.toString() == providerId }
@@ -257,7 +257,7 @@ private fun appListSkillsTool(skills: () -> List<SkillMetadata>) = Tool(
         )
     },
     execute = { args ->
-        val query = args.stringArg("query").trim()
+        val query = args.strArg("query").trim()
         val payload = buildJsonArray {
             skills()
                 .filter {
@@ -309,11 +309,15 @@ private fun appOpenTool(appEventBus: AppEventBus) = Tool(
         )
     },
     execute = { args ->
-        val target = args.stringArg("target").trim().lowercase()
-        val id = args.stringArg("id").trim()
+        val target = args.strArg("target").trim().lowercase()
+        val id = args.strArg("id").trim()
         val screen = appOpenTargetScreen(target, id)
         if (screen == null) {
-            listOf(UIMessagePart.Text("Unknown or incomplete target: $target. Provide one of the enum values, plus `id` for assistant/workspace."))
+            listOf(
+                UIMessagePart.Text(
+                    "Unknown or incomplete target: $target. Provide one of the enum values, plus `id` for assistant/workspace."
+                )
+            )
         } else {
             appEventBus.emit(AppEvent.Navigate(screen))
             listOf(UIMessagePart.Text("Opened $target on the device."))
@@ -368,17 +372,3 @@ private fun providerOf(settings: Settings, modelId: Uuid): ProviderSetting? =
 
 /** 提供商的具体类型名，界面上就是用这个区分 OpenAI / Claude / Google / 账号登录 */
 private fun providerTypeName(provider: ProviderSetting): String = provider::class.simpleName.orEmpty()
-
-private fun kotlinx.serialization.json.JsonElement.stringArg(name: String): String =
-    (this as? kotlinx.serialization.json.JsonObject)
-        ?.get(name)
-        ?.jsonPrimitive
-        ?.contentOrNull
-        .orEmpty()
-
-private fun kotlinx.serialization.json.JsonElement.booleanArg(name: String): Boolean? =
-    (this as? kotlinx.serialization.json.JsonObject)
-        ?.get(name)
-        ?.jsonPrimitive
-        ?.contentOrNull
-        ?.toBooleanStrictOrNull()

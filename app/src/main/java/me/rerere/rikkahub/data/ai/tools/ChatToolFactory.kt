@@ -11,6 +11,7 @@ import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.tools.local.LocalTools
 import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.event.AppEventBus
 import me.rerere.rikkahub.data.files.FileFolders
 import me.rerere.rikkahub.data.model.AgentPermissionLevel
@@ -48,6 +49,7 @@ class ChatToolFactory(
     private val skillManager: SkillManager,
     private val workspaceRepository: WorkspaceRepository,
     private val appEventBus: AppEventBus,
+    private val settingsStore: SettingsStore,
     /** 延迟解析，ChatService 依赖本类，直接构造会成环 */
     private val lazyCwdWriter: Lazy<ConversationCwdWriter>? = null,
 ) {
@@ -87,6 +89,17 @@ class ChatToolFactory(
                     workspace = { workspaceRepository.listFlow().first() },
                     skills = { skillManager.listSkills() },
                     appEventBus = appEventBus,
+                )
+            )
+            // F2 CONFIG 档：写助手/技能/设置/MCP/快捷消息/模式注入（不碰凭据）
+            addAll(
+                createAppConfigTools(
+                    updateSettings = { block -> settingsStore.update(block) },
+                    saveSkill = skillManager::saveSkill,
+                    deleteSkill = skillManager::deleteSkill,
+                    currentAssistantId = assistant.id,
+                    workspaces = { workspaceRepository.listFlow().first() },
+                    skills = { skillManager.listSkills() },
                 )
             )
             if (assistant.enabledSkills.isNotEmpty()) {

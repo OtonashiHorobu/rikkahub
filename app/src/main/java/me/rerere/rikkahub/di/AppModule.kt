@@ -110,6 +110,7 @@ val appModule = module {
             skillManager = get(),
             workspaceRepository = get(),
             appEventBus = get(),
+            settingsStore = get(),
             // ChatService 反依赖本类，用 Lazy 断开构造期的环
             lazyCwdWriter = lazy { get<ChatService>() },
         )
