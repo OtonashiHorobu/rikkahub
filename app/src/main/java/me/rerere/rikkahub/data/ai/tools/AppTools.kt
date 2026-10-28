@@ -311,21 +311,7 @@ private fun appOpenTool(appEventBus: AppEventBus) = Tool(
     execute = { args ->
         val target = args.stringArg("target").trim().lowercase()
         val id = args.stringArg("id").trim()
-        val screen = when (target) {
-            "assistants" -> Screen.Assistant
-            "assistant" -> id.takeIf { it.isNotBlank() }?.let { Screen.AssistantDetail(it) }
-            "workspaces" -> Screen.Workspaces
-            "workspace" -> id.takeIf { it.isNotBlank() }?.let { Screen.WorkspaceDetail(it) }
-            "skills" -> Screen.Skills
-            "prompts" -> Screen.Prompts
-            "quick_messages" -> Screen.QuickMessages
-            "mcp" -> Screen.SettingMcp
-            "providers" -> Screen.SettingProvider
-            "models" -> Screen.SettingModels
-            "settings" -> Screen.Setting
-            "web" -> Screen.SettingWeb
-            else -> null
-        }
+        val screen = appOpenTargetScreen(target, id)
         if (screen == null) {
             listOf(UIMessagePart.Text("Unknown or incomplete target: $target. Provide one of the enum values, plus `id` for assistant/workspace."))
         } else {
@@ -348,6 +334,23 @@ internal fun providerSummary(provider: ProviderSetting, includeModels: Boolean):
             provider.models.forEach { model -> add(modelSummary(model, provider)) }
         }
     }
+}
+
+/** `app_open` 的 target → 路由；缺 id 的 assistant/workspace 返回 null，交给调用方报错 */
+internal fun appOpenTargetScreen(target: String, id: String): Screen? = when (target) {
+    "assistants" -> Screen.Assistant
+    "assistant" -> id.takeIf { it.isNotBlank() }?.let { Screen.AssistantDetail(it) }
+    "workspaces" -> Screen.Workspaces
+    "workspace" -> id.takeIf { it.isNotBlank() }?.let { Screen.WorkspaceDetail(it) }
+    "skills" -> Screen.Skills
+    "prompts" -> Screen.Prompts
+    "quick_messages" -> Screen.QuickMessages
+    "mcp" -> Screen.SettingMcp
+    "providers" -> Screen.SettingProvider
+    "models" -> Screen.SettingModels
+    "settings" -> Screen.Setting
+    "web" -> Screen.SettingWeb
+    else -> null
 }
 
 internal fun modelSummary(model: Model, provider: ProviderSetting) = buildJsonObject {
